@@ -81,6 +81,7 @@ const envSchema = z.object({
   // LLM_PROVIDER: "auto" => Gateway iff AI_GATEWAY_API_KEY present, else OpenAI fallback.
   LLM_PROVIDER: z.enum(["auto", "gateway", "openai"]).default("auto"),
   AI_GATEWAY_API_KEY: optionalString(),
+  EXA_API_KEY: optionalString(),
   GATEWAY_FAST_MODEL: z.string().default("openai/gpt-5.4-mini"),
   GATEWAY_DEFAULT_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
   GATEWAY_REASONING_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
