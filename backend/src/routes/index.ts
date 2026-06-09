@@ -1,0 +1,54 @@
+import { Router } from "express";
+
+import { activityRouter } from "./activity.routes.js";
+import { agentsRouter } from "./agents.routes.js";
+import { aiOperationsRouter } from "./aiOperations.routes.js";
+import { approvalsRouter } from "./approvals.routes.js";
+import { artifactsRouter } from "./artifacts.routes.js";
+import { authRouter } from "./auth.routes.js";
+import { billingRouter } from "./billing.routes.js";
+import { commandRouter } from "./command.routes.js";
+import { commandSessionsRouter } from "./commandSessions.routes.js";
+import { memoryRouter } from "./memory.routes.js";
+import { contextRouter } from "./context.routes.js";
+import { dashboardRouter } from "./dashboard.routes.js";
+import { healthRouter } from "./health.routes.js";
+import { internalWorkerRouter } from "./internalWorker.routes.js";
+import { integrationsRouter } from "./integrations.routes.js";
+import { notificationsRouter } from "./notifications.routes.js";
+import { onboardingRouter } from "./onboarding.routes.js";
+import { monitoredSourcesRouter } from "./monitoredSources.routes.js";
+import { savedItemsRouter } from "./savedItems.routes.js";
+import { workflowsRouter } from "./workflows.routes.js";
+import { workspacesRouter } from "./workspaces.routes.js";
+import { sseRouter } from "./sse.routes.js";
+import { webhooksRouter } from "./webhooks.routes.js";
+
+import { workerRouter } from "./worker.routes.js";
+
+export const apiRouter = Router();
+
+apiRouter.use(healthRouter);
+apiRouter.use("/webhooks", webhooksRouter);
+apiRouter.use(sseRouter);
+apiRouter.use(internalWorkerRouter);
+apiRouter.use("/internal/worker", workerRouter);
+apiRouter.use(authRouter);
+apiRouter.use(billingRouter);
+apiRouter.use(dashboardRouter);
+apiRouter.use(aiOperationsRouter);
+apiRouter.use(activityRouter);
+apiRouter.use(notificationsRouter);
+apiRouter.use(integrationsRouter);
+apiRouter.use(agentsRouter);
+apiRouter.use(approvalsRouter);
+apiRouter.use(artifactsRouter);
+apiRouter.use(savedItemsRouter);
+apiRouter.use(workflowsRouter);
+apiRouter.use(monitoredSourcesRouter);
+apiRouter.use(contextRouter);
+apiRouter.use(commandRouter);
+apiRouter.use(commandSessionsRouter);
+apiRouter.use(memoryRouter);
+apiRouter.use(workspacesRouter);
+apiRouter.use(onboardingRouter);
