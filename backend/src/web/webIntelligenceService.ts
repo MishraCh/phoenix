@@ -10,9 +10,9 @@ import type { CurrentWorkspace } from "../services/currentWorkspaceService.js";
 import { sourceRefSchema, type SourceRef } from "../schemas/coreSchemas.js";
 import { ApiError } from "../utils/apiError.js";
 import { createExtractProvider, type ExtractProvider } from "./providers/providerFactory.js";
+import { ExaSearchProvider } from "./providers/exaSearchProvider.js";
 import { ReasoningExtractProvider } from "./providers/reasoningExtractProvider.js";
 import { OpenAIWebSearchProvider } from "./providers/openAIWebSearchProvider.js";
-import { webResearchGraph } from "../ai/graphs/webResearchGraph.js";
 import { WebIntelligenceRepository } from "./webIntelligenceRepository.js";
 import { type WebCitation } from "./webIntelligenceSchemas.js";
 import { env } from "../config/env.js";
@@ -222,28 +222,31 @@ export class WebIntelligenceService {
     });
 
     try {
-      const state = await webResearchGraph.invoke({ 
-        prompt: input.prompt, 
-        processor: input.processor ?? "core",
+      // Research now runs directly against Exa's grounded /answer (no LangGraph),
+      // which returns a synthesized, cited answer — never a raw list of URLs.
+      const searchProvider = new ExaSearchProvider();
+      const searchResult = await searchProvider.search({
+        query: input.prompt,
+        depth: input.depth === "deep" ? "deep" : "quick",
         contextPacket: input.contextPacket,
-        semanticIntent: input.contextPacket?.semanticIntent,
-        depth: input.depth ?? "standard",
-      } as any);
+      });
+
+      const contentTextRaw =
+        typeof searchResult.content === "string" ? searchResult.content : "";
+      const sourceRefs = searchResult.sourceRefs;
+      const citations: WebCitation[] = sourceRefs.map((ref) => ({
+        ...(ref.title ? { title: ref.title } : {}),
+        ...(ref.url ? { url: ref.url } : {}),
+        snippet: contentTextRaw.slice(0, 280),
+        ...(typeof ref.confidence === "number" ? { confidence: ref.confidence } : {}),
+      }));
       const result = {
-        run: { runId: `org_${Date.now()}` },
-        basis: state.finalCitations,
-        content: state.finalOutput,
-        completeness: Number(state.completeness ?? 0),
-        confidence: Number(state.confidence ?? 0),
-        failedSources: Array.isArray(state.failedSources)
-          ? state.failedSources.filter((value): value is string => typeof value === "string")
-          : [],
+        run: { runId: `exa_${Date.now()}` },
+        content: contentTextRaw,
+        completeness: sourceRefs.length > 0 ? 1 : 0,
+        confidence: sourceRefs.length > 0 ? 0.8 : 0.3,
+        failedSources: [] as string[],
       };
-      
-      const citations = extractCitations(result.basis);
-      const sourceRefs = citationsToSourceRefs(citations, "openai_graph");
-      
-      const contentTextRaw = typeof result.content === "string" ? result.content : JSON.stringify(result.content, null, 2);
       const contentText = contentTextRaw.trim().length > 0 ? contentTextRaw : "Research completed but no relevant content was found or extracted.";
       
       const cache = await this.repository.saveTaskCache({
