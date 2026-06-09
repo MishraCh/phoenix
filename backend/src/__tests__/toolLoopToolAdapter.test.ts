@@ -47,7 +47,8 @@ describe("toolLoopToolAdapter", () => {
     evaluateActionMock.mockReturnValue({ status: "allowed", requiresApproval: false, reason: "" });
     const { def, invoke } = makeToolDef();
     const aiTool = adaptToolForAgent(def, ctx);
-    const result = await aiTool.execute({ prompt: "x" });
+    const exec = aiTool.execute as (i: unknown) => Promise<unknown>;
+    const result = await exec({ prompt: "x" });
     expect(invoke).toHaveBeenCalledWith({ prompt: "x" });
     expect(result).toEqual({ ok: true });
   });
@@ -56,7 +57,8 @@ describe("toolLoopToolAdapter", () => {
     evaluateActionMock.mockReturnValue({ status: "approval_required", requiresApproval: true, reason: "needs approval" });
     const { def, invoke } = makeToolDef({ name: "hubspot.updateApproved", riskLevel: "high", requiresApproval: true });
     const aiTool = adaptToolForAgent(def, ctx);
-    const result = (await aiTool.execute({ prompt: "x" })) as { status: string };
+    const exec = aiTool.execute as (i: unknown) => Promise<unknown>;
+    const result = (await exec({ prompt: "x" })) as { status: string };
     expect(invoke).not.toHaveBeenCalled();
     expect(result.status).toBe("approval_required");
   });
@@ -65,7 +67,8 @@ describe("toolLoopToolAdapter", () => {
     evaluateActionMock.mockReturnValue({ status: "blocked", requiresApproval: false, reason: "viewer cannot write" });
     const { def, invoke } = makeToolDef();
     const aiTool = adaptToolForAgent(def, ctx);
-    const result = (await aiTool.execute({ prompt: "x" })) as { status: string };
+    const exec = aiTool.execute as (i: unknown) => Promise<unknown>;
+    const result = (await exec({ prompt: "x" })) as { status: string };
     expect(invoke).not.toHaveBeenCalled();
     expect(result.status).toBe("blocked");
   });

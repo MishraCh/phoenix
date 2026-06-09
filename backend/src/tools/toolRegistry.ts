@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Request } from "express";
 import type { Firestore } from "firebase-admin/firestore";
-import { tool, type StructuredToolInterface } from "@langchain/core/tools";
+import { createTool as tool, type GideonTool } from "./toolShim.js";
 import { z } from "zod";
 
 import { ApprovalService } from "../approvals/approvalService.js";
@@ -37,7 +37,7 @@ export type ToolDefinition = {
   requiresApproval: boolean;
   idempotencyRequired: boolean;
   exposedToPlanner?: boolean;
-  buildTool: (context: ToolExecutionContext) => StructuredToolInterface;
+  buildTool: (context: ToolExecutionContext) => GideonTool;
 };
 
 const artifactCreateInputSchema = z.object({
