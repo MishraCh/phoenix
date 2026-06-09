@@ -26,7 +26,9 @@ export function adaptToolForAgent(toolDef: ToolDefinition, context: ToolExecutio
 
   return tool({
     description: toolDef.description,
-    inputSchema: toolDef.inputSchema,
+    // ToolDefinition schemas are dynamic (z.ZodTypeAny), so the generic inference
+    // of tool() can't narrow them — cast is intentional for this generic adapter.
+    inputSchema: toolDef.inputSchema as never,
     execute: async (input: Record<string, unknown>) => {
       const decision = policy.evaluateAction({
         currentWorkspace: context.currentWorkspace,
