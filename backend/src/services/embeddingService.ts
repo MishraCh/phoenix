@@ -1,4 +1,5 @@
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { embed, embedMany } from "ai";
+import { openai } from "@ai-sdk/openai";
 
 import { logger } from "../observability/logger.js";
 
@@ -8,33 +9,43 @@ export interface EmbeddingProvider {
 }
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
-  private readonly client: OpenAIEmbeddings;
+  private readonly modelName: string;
+  private readonly dimensions: number;
 
   constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    if (!process.env.OPENAI_API_KEY) {
       throw new Error(
         "EmbeddingService: OPENAI_API_KEY is not set. " +
           "Set OPENAI_API_KEY to enable embedding-based retrieval.",
       );
     }
 
-    const modelName = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-large";
-    const dimensions = parseInt(process.env.OPENAI_EMBEDDING_DIMENSIONS ?? "1536", 10);
+    this.modelName = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-large";
+    this.dimensions = parseInt(process.env.OPENAI_EMBEDDING_DIMENSIONS ?? "1536", 10);
+  }
 
-    this.client = new OpenAIEmbeddings({
-      openAIApiKey: apiKey,
-      modelName,
-      dimensions,
-    });
+  private dimsOption() {
+    return this.modelName.startsWith("text-embedding-3")
+      ? { providerOptions: { openai: { dimensions: this.dimensions } } }
+      : {};
   }
 
   async embed(text: string): Promise<number[]> {
-    return this.client.embedQuery(text);
+    const { embedding } = await embed({
+      model: openai.embedding(this.modelName),
+      value: text,
+      ...this.dimsOption(),
+    });
+    return embedding;
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    return this.client.embedDocuments(texts);
+    const { embeddings } = await embedMany({
+      model: openai.embedding(this.modelName),
+      values: texts,
+      ...this.dimsOption(),
+    });
+    return embeddings;
   }
 }
 
@@ -42,14 +53,9 @@ export class EmbeddingService {
   private readonly provider: EmbeddingProvider;
 
   constructor() {
-    const providerName = process.env.EMBEDDING_PROVIDER ?? "openai";
-    if (providerName === "openai") {
-      this.provider = new OpenAIEmbeddingProvider();
-    } else {
-      throw new Error(
-        `EmbeddingService: unknown provider "${providerName}". Supported: openai`,
-      );
-    }
+    // Embeddings are OpenAI-backed under the hood regardless of LLM provider
+    // selection (Anthropic offers no embeddings). Always use OpenAI here.
+    this.provider = new OpenAIEmbeddingProvider();
   }
 
   embed(text: string): Promise<number[]> {
@@ -65,9 +71,7 @@ export class EmbeddingService {
    * Use this as a guard before constructing EmbeddingService.
    */
   static isConfigured(): boolean {
-    const provider = process.env.EMBEDDING_PROVIDER ?? "openai";
-    if (provider === "openai") return Boolean(process.env.OPENAI_API_KEY);
-    return false;
+    return Boolean(process.env.OPENAI_API_KEY);
   }
 
   /**

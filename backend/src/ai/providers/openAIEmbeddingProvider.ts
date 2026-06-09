@@ -1,9 +1,14 @@
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { embedMany } from "ai";
+import { openai } from "@ai-sdk/openai";
 
 import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/apiError.js";
 import type { EmbeddingProvider } from "./embeddingProvider.js";
 
+/**
+ * Direct-OpenAI fallback embedding provider (used when the Gateway is not
+ * selected). Uses the Vercel AI SDK's OpenAI provider — no LangChain dependency.
+ */
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly providerName = "openai";
   readonly modelName = env.OPENAI_EMBEDDING_MODEL;
@@ -18,12 +23,14 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       });
     }
 
-    const embedder = new OpenAIEmbeddings({
-      apiKey: env.OPENAI_API_KEY,
-      model: this.modelName,
-      ...(this.modelName.startsWith("text-embedding-3") ? { dimensions: this.dimensions } : {}),
+    const { embeddings } = await embedMany({
+      model: openai.embedding(this.modelName),
+      values: texts,
+      ...(this.modelName.startsWith("text-embedding-3")
+        ? { providerOptions: { openai: { dimensions: this.dimensions } } }
+        : {}),
     });
 
-    return embedder.embedDocuments(texts);
+    return embeddings;
   }
 }

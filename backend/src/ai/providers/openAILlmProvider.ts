@@ -1,7 +1,7 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { sanitizeAiOutput } from "../../utils/aiOutputSanitizer.js";
+import { generateObject } from "ai";
+import { openai } from "@ai-sdk/openai";
 
+import { sanitizeAiOutput } from "../../utils/aiOutputSanitizer.js";
 import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/apiError.js";
 import {
@@ -10,6 +10,10 @@ import {
 } from "../execution/aiExecutionBudget.js";
 import type { LLMProvider, StructuredGenerateInput } from "./llmProvider.js";
 
+/**
+ * Direct-OpenAI fallback LLM provider (used when the Gateway is not selected).
+ * Uses the Vercel AI SDK's OpenAI provider — no LangChain dependency.
+ */
 export class OpenAILlmProvider implements LLMProvider {
   readonly providerName = "openai";
   readonly modelName: string;
@@ -18,7 +22,9 @@ export class OpenAILlmProvider implements LLMProvider {
     this.modelName = modelName ?? env.OPENAI_CHAT_MODEL ?? env.OPENAI_MODEL ?? "gpt-5.5";
   }
 
-  private getModel(maxTokens?: number) {
+  async generateStructured<Output extends Record<string, unknown>>(
+    input: StructuredGenerateInput<Output>,
+  ): Promise<Output> {
     if (!env.OPENAI_API_KEY) {
       throw new ApiError({
         code: "LLM_CONFIG_MISSING",
@@ -27,59 +33,37 @@ export class OpenAILlmProvider implements LLMProvider {
       });
     }
 
-    return new ChatOpenAI({
-      apiKey: env.OPENAI_API_KEY,
-      modelName: this.modelName,
-      ...(maxTokens ? { maxTokens } : {}),
-      timeout: 60_000,
-    });
-  }
-
-  async generateStructured<Output extends Record<string, unknown>>(
-    input: StructuredGenerateInput<Output>,
-  ) {
     const execution = getAiExecutionContext();
     const estimatedInputTokens = estimateTokens(`${input.systemPrompt}\n${input.userPrompt}`);
-    const maxOutputTokens = execution?.budget.reserveCall(
-      estimatedInputTokens,
-      input.maxOutputTokens,
-      input.budgetScope,
-    ) ?? input.maxOutputTokens;
+    const maxOutputTokens =
+      execution?.budget.reserveCall(estimatedInputTokens, input.maxOutputTokens, input.budgetScope) ??
+      input.maxOutputTokens;
     const startedAt = performance.now();
-    const model = this.getModel(maxOutputTokens).withStructuredOutput(input.schema, {
-      name: "respond",
-      method: "functionCalling",
-    });
 
     try {
-      const result = await model.invoke(
-        [
-          new SystemMessage(input.systemPrompt),
-          new HumanMessage(input.userPrompt),
-        ],
-        execution ? { signal: execution.signal } : undefined,
-      ) as Output | undefined;
+      const { object, usage } = await generateObject({
+        model: openai(this.modelName),
+        schema: input.schema,
+        system: input.systemPrompt,
+        prompt: input.userPrompt,
+        ...(maxOutputTokens ? { maxOutputTokens } : {}),
+        ...(execution ? { abortSignal: execution.signal } : {}),
+      });
 
-      if (!result) {
-        throw new Error("LLM failed to return structured output (returned undefined).");
-      }
+      const sanitizedResult = sanitizeAiOutput(object) as Output;
+      const inputTokens = usage?.inputTokens ?? estimatedInputTokens;
+      const outputTokens = usage?.outputTokens ?? estimateTokens(JSON.stringify(sanitizedResult));
 
-      const sanitizedResult = sanitizeAiOutput(result);
-
-      const estimatedOutputTokens = estimateTokens(JSON.stringify(sanitizedResult));
-      execution?.budget.recordGeneratedTokens(
-        estimatedOutputTokens,
-        input.budgetScope,
-      );
+      execution?.budget.recordGeneratedTokens(outputTokens, input.budgetScope);
       execution?.recordUsage({
         provider: this.providerName,
         model: this.modelName,
         role: this.role,
-        inputTokens: estimatedInputTokens,
-        outputTokens: estimatedOutputTokens,
+        inputTokens,
+        outputTokens,
         latencyMs: Number((performance.now() - startedAt).toFixed(2)),
         success: true,
-        estimated: true,
+        estimated: !usage,
         scope: input.budgetScope ?? "execution",
       });
       return sanitizedResult;
