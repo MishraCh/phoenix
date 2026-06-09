@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { Request } from "express";
-import { END, START, Annotation, StateGraph } from "@langchain/langgraph";
+import { END, START, Annotation, StateGraph } from "./stateGraphShim.js";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { z } from "zod";
