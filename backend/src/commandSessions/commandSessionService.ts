@@ -604,6 +604,21 @@ export class CommandSessionService {
     return { session, messages };
   }
 
+  /** Recent conversation turns for agent working memory (Tier-1 continuity). */
+  async getRecentMessages(
+    workspace: CurrentWorkspace,
+    sessionId: string,
+    limit = 12,
+  ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+    const messages = await this.repo.getMessages(workspace.id, sessionId, limit);
+    return messages
+      .map((message) => ({
+        role: message.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: typeof message.content === "string" ? message.content : "",
+      }))
+      .filter((message) => message.content.length > 0);
+  }
+
   async update(
     workspace: CurrentWorkspace,
     sessionId: string,

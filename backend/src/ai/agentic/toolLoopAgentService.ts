@@ -11,17 +11,33 @@ import type { SourceRef } from "../../schemas/coreSchemas.js";
 import { adaptToolForAgent } from "./toolLoopToolAdapter.js";
 import { buildToolLoopInstructions } from "./toolLoopPrompts.js";
 
+/** A resolved entity carried in session state for reference resolution. */
+export type ActiveEntity = { label: string; objectType?: string; id?: string };
+
 /** Input subset the agentic path needs (structurally compatible with the command graph input). */
 export type AgentRunInput = {
   input: string;
   mode?: string;
   userId: string;
   currentWorkspace: CurrentWorkspace;
+  /** Working memory: prior conversation turns (Tier 1 continuity). */
+  messages?: Array<{ role: "user" | "assistant"; content: string }>;
   sessionContext?: string;
+  /** Compressed session state incl. the active-entity register (Tier 2). */
+  sessionState?: { activeEntities?: ActiveEntity[]; recentResults?: unknown[] } | null;
   agentSystemPromptAddition?: string | null;
   agentAllowedTools?: string[] | null;
 };
 
+type ToolResultOutput = {
+  sourceRefs?: SourceRef[];
+  approvalId?: string;
+  artifactId?: string;
+  workflowId?: string;
+  label?: string;
+  riskLevel?: string;
+  requiresApproval?: boolean;
+};
 type LoopStep = { toolResults?: Array<{ toolName?: string; output?: unknown }> };
 
 /**
@@ -55,13 +71,37 @@ export class ToolLoopAgentService {
       tools[def.name] = adaptToolForAgent(def, context);
     }
 
+    // Accumulate sources + created entities from the tool loop (result parity).
     const sourceRefs: SourceRef[] = [];
-    const collectSources = (step: LoopStep) => {
+    const proposedActions: Array<Record<string, unknown>> = [];
+    let createdApproval: Record<string, unknown> | null = null;
+    let createdArtifact: Record<string, unknown> | null = null;
+    let createdWorkflow: Record<string, unknown> | null = null;
+
+    const collectFromStep = (step: LoopStep) => {
       for (const tr of step.toolResults ?? []) {
-        const out = tr.output as { sourceRefs?: SourceRef[] } | undefined;
-        if (out?.sourceRefs?.length) sourceRefs.push(...out.sourceRefs);
+        const out = tr.output as ToolResultOutput | undefined;
+        if (!out) continue;
+        if (out.sourceRefs?.length) sourceRefs.push(...out.sourceRefs);
+        if (out.approvalId) {
+          createdApproval = out;
+          proposedActions.push({
+            id: out.approvalId,
+            label: out.label ?? "Proposed action",
+            riskLevel: out.riskLevel ?? "medium",
+            requiresApproval: out.requiresApproval ?? true,
+          });
+        }
+        if (out.artifactId) createdArtifact = out;
+        if (out.workflowId) createdWorkflow = out;
       }
     };
+
+    // Tier-1 working memory: prior turns + the new user turn.
+    const messages = [
+      ...(input.messages ?? []),
+      { role: "user" as const, content: input.input },
+    ];
 
     try {
       const agent = new ToolLoopAgent({
@@ -69,60 +109,71 @@ export class ToolLoopAgentService {
         instructions: buildToolLoopInstructions(input),
         tools,
         stopWhen: stepCountIs(maxSteps),
-        onStepFinish: collectSources,
+        onStepFinish: collectFromStep,
       });
 
       const { text, steps } = await agent.generate({
-        prompt: input.input,
+        messages,
         ...(execution ? { abortSignal: execution.signal } : {}),
       });
-      for (const step of (steps ?? []) as LoopStep[]) collectSources(step);
+      for (const step of (steps ?? []) as LoopStep[]) collectFromStep(step);
 
       logger.info("ToolLoopAgent run completed", {
         agentRunId,
         steps: steps?.length ?? 0,
         sources: sourceRefs.length,
+        proposedActions: proposedActions.length,
       });
 
-      return this.buildResponse(
-        agentRunId,
-        input,
-        text || "I couldn't complete that request.",
-        dedupeSources(sourceRefs),
-      );
+      return this.buildResponse(agentRunId, input, {
+        answer: text || "I couldn't complete that request.",
+        sourceRefs: dedupeSources(sourceRefs),
+        proposedActions,
+        createdApproval,
+        createdArtifact,
+        createdWorkflow,
+      });
     } catch (error) {
       logger.warn("ToolLoopAgent run failed", {
         agentRunId,
         error: error instanceof Error ? error.message : String(error),
       });
-      return this.buildResponse(
-        agentRunId,
-        input,
-        "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
-        dedupeSources(sourceRefs),
-      );
+      return this.buildResponse(agentRunId, input, {
+        answer: "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
+        sourceRefs: dedupeSources(sourceRefs),
+        proposedActions,
+        createdApproval,
+        createdArtifact,
+        createdWorkflow,
+      });
     }
   }
 
   private buildResponse(
     agentRunId: string,
     input: AgentRunInput,
-    answer: string,
-    sourceRefs: SourceRef[],
+    parts: {
+      answer: string;
+      sourceRefs: SourceRef[];
+      proposedActions: Array<Record<string, unknown>>;
+      createdApproval: Record<string, unknown> | null;
+      createdArtifact: Record<string, unknown> | null;
+      createdWorkflow: Record<string, unknown> | null;
+    },
   ): Record<string, unknown> {
     return {
-      answer,
+      answer: parts.answer,
       agentRunId,
       resolvedMode: input.mode ?? "auto",
       resultType: "answer",
       result: null,
-      proposedActions: [],
+      proposedActions: parts.proposedActions,
       artifactDrafts: [],
-      createdArtifact: null,
-      createdApproval: null,
-      createdWorkflow: null,
-      sources: sourceRefs.map((s) => ({ ...s })),
-      sourceRefs,
+      createdArtifact: parts.createdArtifact,
+      createdApproval: parts.createdApproval,
+      createdWorkflow: parts.createdWorkflow,
+      sources: parts.sourceRefs.map((s) => ({ ...s })),
+      sourceRefs: parts.sourceRefs,
       missingContext: [],
       creditsCharged: 0,
       routeDecision: null,

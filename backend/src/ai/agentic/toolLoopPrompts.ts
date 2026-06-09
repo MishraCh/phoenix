@@ -12,6 +12,15 @@ export function buildToolLoopInstructions(input: AgentRunInput): string {
   if (input.agentSystemPromptAddition) {
     parts.push(`\nAGENT PERSONA:\n${input.agentSystemPromptAddition}`);
   }
+  const entities = input.sessionState?.activeEntities ?? [];
+  if (entities.length) {
+    const lines = entities
+      .map((e) => `- ${e.label}${e.objectType ? ` (${e.objectType})` : ""}${e.id ? ` [id:${e.id}]` : ""}`)
+      .join("\n");
+    parts.push(
+      `\nACTIVE ENTITIES (resolve references like "it", "that company", "her", "them" to these — do not re-ask the user for IDs already established):\n${lines}`,
+    );
+  }
   if (input.sessionContext) {
     parts.push(`\nCONVERSATION CONTEXT:\n${input.sessionContext}`);
   }

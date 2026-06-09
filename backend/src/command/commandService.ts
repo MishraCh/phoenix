@@ -126,6 +126,9 @@ export class CommandService {
       { firstQuery: input.input, mode: normalizedMode, source: input.source },
     );
 
+    // Prior turns (before the new one is appended) = agent working memory.
+    const priorMessages = await sessionService.getRecentMessages(input.currentWorkspace, session.id, 12);
+
     await sessionService.appendUserMessage(input.currentWorkspace, session.id, input.input, normalizedMode, input.agentId ?? null, input.source ?? "web");
 
     const [sessionContext, sessionState] = await Promise.all([
@@ -219,6 +222,7 @@ export class CommandService {
             sessionId: session.id,
             sessionContext,
             sessionState,
+            messages: priorMessages,
             agentSystemPromptAddition,
             agentAllowedTools,
             progressEmit,

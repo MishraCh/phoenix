@@ -30,6 +30,7 @@ vi.mock("../policy/policyService.js", () => ({
 }));
 
 import { ToolLoopAgentService } from "../ai/agentic/toolLoopAgentService.js";
+import { buildToolLoopInstructions } from "../ai/agentic/toolLoopPrompts.js";
 
 const baseInput = {
   input: "Research Acme and summarize",
@@ -92,5 +93,65 @@ describe("ToolLoopAgentService", () => {
     const result = (await new ToolLoopAgentService({} as any).run(baseInput)) as any;
     expect(result.resultType).toBe("answer");
     expect(result.answer.length).toBeGreaterThan(0);
+  });
+
+  it("passes prior turns + the new input as messages to the agent (continuity)", async () => {
+    generateMock.mockResolvedValue({ text: "ok", steps: [] });
+    const input = {
+      ...baseInput,
+      messages: [
+        { role: "user", content: "Tell me about Acme Corp" },
+        { role: "assistant", content: "Acme is a SaaS company." },
+      ],
+    };
+    await new ToolLoopAgentService({} as any).run(input);
+    const callArg = generateMock.mock.calls[0][0] as { messages: Array<{ role: string; content: string }> };
+    expect(Array.isArray(callArg.messages)).toBe(true);
+    expect(callArg.messages).toHaveLength(3);
+    expect(callArg.messages[0].content).toContain("Acme Corp");
+    expect(callArg.messages.at(-1)).toEqual({ role: "user", content: "Research Acme and summarize" });
+  });
+
+  it("surfaces a created approval from tool results (result parity)", async () => {
+    generateMock.mockResolvedValue({
+      text: "Drafted an outreach email for your approval.",
+      steps: [
+        {
+          toolResults: [
+            {
+              toolName: "gmail.prepareSendApproval",
+              output: { approvalId: "ap_1", label: "Email to Jane", riskLevel: "medium", requiresApproval: true },
+            },
+          ],
+        },
+      ],
+    });
+    const result = (await new ToolLoopAgentService({} as any).run(baseInput)) as any;
+    expect(result.createdApproval?.approvalId).toBe("ap_1");
+    expect(result.proposedActions).toHaveLength(1);
+    expect(result.proposedActions[0].id).toBe("ap_1");
+  });
+});
+
+describe("buildToolLoopInstructions", () => {
+  it("injects the active-entities register when present", () => {
+    const out = buildToolLoopInstructions({
+      input: "email her",
+      userId: "u1",
+      currentWorkspace: { workspace: { id: "w1" } },
+      sessionState: { activeEntities: [{ label: "Jane Doe", objectType: "contact", id: "c1" }] },
+    } as never);
+    expect(out).toContain("ACTIVE ENTITIES");
+    expect(out).toContain("Jane Doe");
+    expect(out).toContain("c1");
+  });
+
+  it("omits the entity block when there are no entities", () => {
+    const out = buildToolLoopInstructions({
+      input: "hello",
+      userId: "u1",
+      currentWorkspace: { workspace: { id: "w1" } },
+    } as never);
+    expect(out).not.toContain("ACTIVE ENTITIES");
   });
 });
