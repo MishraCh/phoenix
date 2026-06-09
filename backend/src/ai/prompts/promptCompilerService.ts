@@ -1,4 +1,3 @@
-import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { ContextResolverService, type ContextResolverInput } from "../context/contextResolverService.js";
 import { logger } from "../../observability/logger.js";
 import type { ExpertTypeId } from "../../experts/types.js";
@@ -38,6 +37,12 @@ export type CompiledPrompt = {
   totalChars: number;
 };
 
+/** Join prompt segments the way the prior ChatPromptTemplate did: keep empty
+ *  substituted segments (e.g. an empty agent addition), drop only null lines. */
+function joinSegments(parts: Array<string | null>): string {
+  return parts.filter((part) => part !== null).join("\n\n");
+}
+
 export class PromptCompilerService {
   private readonly resolver: ContextResolverService;
 
@@ -49,22 +54,26 @@ export class PromptCompilerService {
    * Compiles the standard command orchestration prompt.
    */
   async compileCommandPrompt(input: CommandPromptInput): Promise<CompiledPrompt> {
-    const systemTemplate = [
-      "{manifest}",
-      "{agentAddition}",
-      input.workspaceIdentity?.trim() ? "[WORKSPACE IDENTITY]\n{workspaceIdentity}" : null,
+    const agentAddition = input.agentSystemPromptAddition?.trim()
+      ? input.agentSystemPromptAddition.trim()
+      : "";
+
+    const systemPrompt = joinSegments([
+      input.manifest,
+      agentAddition,
+      input.workspaceIdentity?.trim()
+        ? `[WORKSPACE IDENTITY]\n${input.workspaceIdentity.trim()}`
+        : null,
       "[MODE-SPECIFIC INSTRUCTION]",
-      "Current mode: {mode}",
-      "{modeInstructions}",
+      `Current mode: ${input.mode}`,
+      input.modeInstructions,
       "[FORMATTING RULES]",
       "DO NOT include internal citation markers (like 🗯️cite⭐...) or raw source tags in your final output. Your output must be clean markdown ready for a human to read in an email or document.",
       "[TOOL NAMING RULES]",
       "When proposing an approval action, use only registered tool names.",
       "[SAFETY]",
-      "Use connected integration context when available, but never claim an external write is completed unless an approval exists and its execution completed successfully."
-    ].filter(Boolean).join("\n\n");
-
-    const systemPrompt = SystemMessagePromptTemplate.fromTemplate(systemTemplate);
+      "Use connected integration context when available, but never claim an external write is completed unless an approval exists and its execution completed successfully.",
+    ]);
 
     const resolvedContext = this.resolver.resolve({
       selectedItemContext: input.selectedItemContext,
@@ -78,23 +87,10 @@ export class PromptCompilerService {
 
     const userParts: string[] = [];
     if (resolvedContext.assembled.trim()) {
-      userParts.push("{assembledContext}");
+      userParts.push(resolvedContext.assembled.trim());
     }
-    userParts.push(`[USER MESSAGE]\n{userRequest}`);
-    
-    const userPrompt = HumanMessagePromptTemplate.fromTemplate(userParts.join("\n\n"));
-
-    const chatPrompt = ChatPromptTemplate.fromMessages([systemPrompt, userPrompt]);
-
-    const formattedMessages = await chatPrompt.formatMessages({
-      manifest: input.manifest,
-      agentAddition: input.agentSystemPromptAddition?.trim() ? input.agentSystemPromptAddition.trim() : "",
-      workspaceIdentity: input.workspaceIdentity?.trim() ?? "",
-      mode: input.mode,
-      modeInstructions: input.modeInstructions,
-      userRequest: input.userRequest,
-      assembledContext: resolvedContext.assembled.trim() ? resolvedContext.assembled.trim() : "",
-    });
+    userParts.push(`[USER MESSAGE]\n${input.userRequest}`);
+    const userPrompt = userParts.join("\n\n");
 
     logger.debug("PromptCompiler: compiled command prompt", {
       resolvedSizes: ContextResolverService.formatSizeLog(resolvedContext.sizes),
@@ -102,8 +98,8 @@ export class PromptCompilerService {
     });
 
     return {
-      systemPrompt: formattedMessages[0].content as string,
-      userPrompt: formattedMessages[1].content as string,
+      systemPrompt,
+      userPrompt,
       sizes: resolvedContext.sizes,
       totalChars: resolvedContext.totalChars,
     };
@@ -118,19 +114,19 @@ export class PromptCompilerService {
       throw new Error(`PromptCompiler: Missing expert prompt definition for ${input.expertType}`);
     }
 
-    const systemTemplate = [
+    const systemPrompt = joinSegments([
       "[GIDEON EXPERT MODE]",
-      "{expertSystem}",
-      input.workspaceIdentity?.trim() ? "[WORKSPACE IDENTITY]\nUse this to personalize the expert analysis for this specific business:\n{workspaceIdentity}" : null,
+      definition.system.trim(),
+      input.workspaceIdentity?.trim()
+        ? `[WORKSPACE IDENTITY]\nUse this to personalize the expert analysis for this specific business:\n${input.workspaceIdentity.trim()}`
+        : null,
       "[FORMATTING RULES]",
       "DO NOT include internal citation markers (like 🗯️cite⭐...) or raw source tags in your final output. Your output must be clean markdown ready for a human to read in an email or document.",
       "[SAFETY]",
       "Never invent CRM, email, or research facts that are not present in the supplied context.",
       "If evidence is weak, say so directly and lower confidence.",
-      "Do not convert this into an external action unless the user explicitly asks and the normal approval flow is used elsewhere."
-    ].filter(Boolean).join("\n\n");
-
-    const systemPrompt = SystemMessagePromptTemplate.fromTemplate(systemTemplate);
+      "Do not convert this into an external action unless the user explicitly asks and the normal approval flow is used elsewhere.",
+    ]);
 
     const resolvedContext = this.resolver.resolve({
       selectedItemContext: input.selectedItemContext,
@@ -144,28 +140,14 @@ export class PromptCompilerService {
 
     const userParts: string[] = [];
     if (resolvedContext.assembled.trim()) {
-      userParts.push("{assembledContext}");
+      userParts.push(resolvedContext.assembled.trim());
     }
-
     if (input.missingContext?.length) {
-      userParts.push(`[KNOWN CONTEXT GAPS]\n{missingContextStr}`);
+      userParts.push(`[KNOWN CONTEXT GAPS]\n${input.missingContext.join(", ")}`);
     }
-
-    userParts.push(`[TASK]\n{task}`);
-    userParts.push(`[USER MESSAGE]\n{userRequest}`);
-
-    const userPrompt = HumanMessagePromptTemplate.fromTemplate(userParts.join("\n\n"));
-
-    const chatPrompt = ChatPromptTemplate.fromMessages([systemPrompt, userPrompt]);
-
-    const formattedMessages = await chatPrompt.formatMessages({
-      expertSystem: definition.system.trim(),
-      task: definition.userTask,
-      userRequest: input.userRequest,
-      workspaceIdentity: input.workspaceIdentity?.trim() ?? "",
-      assembledContext: resolvedContext.assembled.trim() ? resolvedContext.assembled.trim() : "",
-      missingContextStr: input.missingContext?.length ? input.missingContext.join(", ") : "",
-    });
+    userParts.push(`[TASK]\n${definition.userTask}`);
+    userParts.push(`[USER MESSAGE]\n${input.userRequest}`);
+    const userPrompt = userParts.join("\n\n");
 
     logger.debug("PromptCompiler: compiled expert prompt", {
       expertType: input.expertType,
@@ -174,8 +156,8 @@ export class PromptCompilerService {
     });
 
     return {
-      systemPrompt: formattedMessages[0].content as string,
-      userPrompt: formattedMessages[1].content as string,
+      systemPrompt,
+      userPrompt,
       sizes: resolvedContext.sizes,
       totalChars: resolvedContext.totalChars,
     };
