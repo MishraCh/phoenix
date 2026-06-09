@@ -7,6 +7,7 @@ import { publishEvent } from "../sse/eventBus.js";
 import { getVisibleAgent, resolveAgent } from "../agents/agentRegistry.js";
 import { CommandGraphService } from "../ai/graphs/commandGraph.js";
 import { ToolLoopAgentService } from "../ai/agentic/toolLoopAgentService.js";
+import { shouldUseToolLoop } from "./commandRouting.js";
 import { env } from "../config/env.js";
 import type { CommandOriginSurface } from "../ai/contracts/commandContracts.js";
 import { commandRequestEnvelopeSchema } from "../ai/contracts/commandRequestEnvelope.js";
@@ -24,11 +25,6 @@ import { AgentConfigRepository } from "../repositories/agentConfigRepository.js"
 import type { CurrentWorkspace } from "../services/currentWorkspaceService.js";
 import { UsageService } from "../usage/usageService.js";
 import { ApiError } from "../utils/apiError.js";
-
-/** When enabled, auto/research commands run through the multi-step ToolLoopAgent. */
-function shouldUseToolLoop(mode: string | undefined): boolean {
-  return env.AGENTIC_TOOLLOOP_V1 && (mode === "auto" || mode === "research" || mode === undefined);
-}
 
 export type RunCommandInput = {
   input: string;
@@ -229,7 +225,7 @@ export class CommandService {
             artifactWritePolicy: "explicit_user_intent" as const,
             requestEnvelope: envelope,
           };
-          return shouldUseToolLoop(input.mode)
+          return shouldUseToolLoop(input.mode, env.AGENTIC_TOOLLOOP_V1)
             ? (new ToolLoopAgentService(this.db).run(runArgs) as ReturnType<
                 CommandGraphService["run"]
               >)
