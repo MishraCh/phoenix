@@ -66,9 +66,12 @@ export class ToolLoopAgentService {
     const defs = await registry.listTools(input.currentWorkspace, input.agentAllowedTools ?? undefined);
     const available = defs.filter((d) => d.available);
 
+    // The Vercel AI SDK / model tool-name schema only allows [a-zA-Z0-9_-], so
+    // dotted registry names (e.g. "web.researchTask") must be sanitized. The
+    // execute closure is bound per-tool, so the key is just the model-facing name.
     const tools: Record<string, ReturnType<typeof adaptToolForAgent>> = {};
     for (const def of available) {
-      tools[def.name] = adaptToolForAgent(def, context);
+      tools[sanitizeToolName(def.name)] = adaptToolForAgent(def, context);
     }
 
     // Accumulate sources + created entities from the tool loop (result parity).
@@ -181,6 +184,11 @@ export class ToolLoopAgentService {
       partialResult: null,
     };
   }
+}
+
+/** Model tool names must match ^[a-zA-Z0-9_-]+$ — registry names use dots. */
+export function sanitizeToolName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 function dedupeSources(refs: SourceRef[]): SourceRef[] {

@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 
 const generateMock = vi.fn();
+const capturedAgentConfig: { value?: any } = {};
 vi.mock("ai", () => ({
   ToolLoopAgent: class {
-    constructor(public cfg: any) {}
+    constructor(cfg: any) {
+      capturedAgentConfig.value = cfg;
+    }
     generate = generateMock;
   },
   tool: (cfg: any) => cfg,
@@ -110,6 +113,15 @@ describe("ToolLoopAgentService", () => {
     expect(callArg.messages).toHaveLength(3);
     expect(callArg.messages[0].content).toContain("Acme Corp");
     expect(callArg.messages.at(-1)).toEqual({ role: "user", content: "Research Acme and summarize" });
+  });
+
+  it("registers tools with model-safe names (no dots — sanitized for the AI SDK)", async () => {
+    generateMock.mockResolvedValue({ text: "ok", steps: [] });
+    capturedAgentConfig.value = undefined;
+    await new ToolLoopAgentService({} as any).run(baseInput); // safeToolDef name is "web.researchTask"
+    const toolKeys = Object.keys(capturedAgentConfig.value.tools);
+    expect(toolKeys).toContain("web_researchTask");
+    expect(toolKeys.every((k) => /^[a-zA-Z0-9_-]+$/.test(k))).toBe(true);
   });
 
   it("surfaces a created approval from tool results (result parity)", async () => {
