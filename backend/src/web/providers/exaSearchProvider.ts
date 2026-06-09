@@ -1,7 +1,7 @@
 import type { Request } from "express";
 import { Timestamp } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
-import Exa from "exa-js";
+import { Exa } from "exa-js";
 
 import { env } from "../../config/env.js";
 import { logger } from "../../observability/logger.js";
@@ -43,7 +43,10 @@ export class ExaSearchProvider {
     const startedAt = performance.now();
 
     try {
-      const response = await exa.answer(input.query, { text: true });
+      const response = (await exa.answer(input.query, { text: true })) as unknown as {
+        answer?: string;
+        citations?: Array<{ url?: string; title?: string }>;
+      };
       const answer = typeof response.answer === "string" ? response.answer.trim() : "";
       if (!answer) {
         throw new Error("Exa returned an empty answer.");

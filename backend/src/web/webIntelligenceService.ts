@@ -9,7 +9,7 @@ import { createLlmProvider } from "../ai/providers/providerRegistry.js";
 import type { CurrentWorkspace } from "../services/currentWorkspaceService.js";
 import { sourceRefSchema, type SourceRef } from "../schemas/coreSchemas.js";
 import { ApiError } from "../utils/apiError.js";
-import { CheerioHtmlExtractProvider } from "./providers/cheerioHtmlExtractProvider.js";
+import { createExtractProvider, type ExtractProvider } from "./providers/providerFactory.js";
 import { ReasoningExtractProvider } from "./providers/reasoningExtractProvider.js";
 import { OpenAIWebSearchProvider } from "./providers/openAIWebSearchProvider.js";
 import { webResearchGraph } from "../ai/graphs/webResearchGraph.js";
@@ -167,13 +167,13 @@ function createDynamicSchema(fields: StructuredExtractInput["fields"]) {
 
 export class WebIntelligenceService {
   private readonly repository: WebIntelligenceRepository;
-  private readonly cheerioExtractProvider: CheerioHtmlExtractProvider;
+  private readonly extractProvider: ExtractProvider;
   private readonly reasoningExtractProvider: ReasoningExtractProvider;
   private readonly activityService: ActivityService;
 
   constructor(private readonly db: Firestore) {
     this.repository = new WebIntelligenceRepository(db);
-    this.cheerioExtractProvider = new CheerioHtmlExtractProvider();
+    this.extractProvider = createExtractProvider();
     this.reasoningExtractProvider = new ReasoningExtractProvider();
     this.activityService = new ActivityService(db);
   }
@@ -353,7 +353,7 @@ export class WebIntelligenceService {
       let resultSessionId = input.sessionId;
 
       try {
-        const result = await this.cheerioExtractProvider.extract({
+        const result = await this.extractProvider.extract({
           urls: normalizedUrls,
           objective: input.objective,
           searchQueries: input.searchQueries,
@@ -364,6 +364,7 @@ export class WebIntelligenceService {
         });
         page = result.pages[0];
         resultSessionId = result.sessionId;
+        usedProvider = (result as { providerUsed?: string }).providerUsed ?? usedProvider;
 
         if (!page) {
           throw new Error("Extraction provider did not return any page results.");

@@ -4,8 +4,9 @@ import { z } from "zod";
 import { createLlmProvider } from "../providers/providerRegistry.js";
 import { AiBudgetExceededError } from "../execution/aiExecutionBudget.js";
 import { DuckDuckGoSearchProvider } from "../../web/providers/duckduckgoSearchProvider.js";
-import { CheerioHtmlExtractProvider } from "../../web/providers/cheerioHtmlExtractProvider.js";
 import { OpenAIWebSearchProvider } from "../../web/providers/openAIWebSearchProvider.js";
+import { ExaSearchProvider } from "../../web/providers/exaSearchProvider.js";
+import { createSearchProvider, createExtractProvider } from "../../web/providers/providerFactory.js";
 import { WebCrawlerProvider } from "../../web/providers/webCrawlerProvider.js";
 import { env } from "../../config/env.js";
 
@@ -72,12 +73,10 @@ async function generateSearchQueries(state: WebResearchState): Promise<Partial<W
 }
 
 async function searchAndScrape(state: WebResearchState): Promise<Partial<WebResearchState>> {
-  const searchProvider = env.WEB_SEARCH_PROVIDER === "openai_web_search"
-    ? new OpenAIWebSearchProvider()
-    : new DuckDuckGoSearchProvider();
+  const searchProvider = createSearchProvider();
   const fallbackProvider = new DuckDuckGoSearchProvider();
 
-  const extractProvider = new CheerioHtmlExtractProvider();
+  const extractProvider = createExtractProvider();
   const crawlerProvider = new WebCrawlerProvider();
 
   const allUrls = new Set<string>();
@@ -91,7 +90,7 @@ async function searchAndScrape(state: WebResearchState): Promise<Partial<WebRese
     confidence?: number;
   }> = [];
   const searchQueries =
-    searchProvider instanceof OpenAIWebSearchProvider
+    searchProvider instanceof OpenAIWebSearchProvider || searchProvider instanceof ExaSearchProvider
       ? [state.prompt]
       : state.depth === "quick" || state.searchQueries.length === 0
         ? [state.prompt]
@@ -124,8 +123,8 @@ async function searchAndScrape(state: WebResearchState): Promise<Partial<WebRese
 
   await Promise.all(searchQueries.map(async (query) => {
     let openaiSuccess = false;
-    if (searchProvider instanceof OpenAIWebSearchProvider) {
-      // Direct integration for OpenAI web_search
+    if (searchProvider instanceof OpenAIWebSearchProvider || searchProvider instanceof ExaSearchProvider) {
+      // Direct integration for synthesized-answer providers (OpenAI web_search / Exa answer)
       try {
         const result = await searchProvider.search({
           query,
@@ -380,7 +379,7 @@ export const webResearchGraph = new StateGraph<WebResearchState>({ channels: gra
   .addNode("synthesize", synthesize as any)
   .addConditionalEdges(
     START,
-    (state) => state.depth === "quick" || env.WEB_SEARCH_PROVIDER === "openai_web_search" || env.WEB_SEARCH_PROVIDER === "miromind_api" ? "search_scrape" : "plan",
+    (state) => state.depth === "quick" || env.WEB_SEARCH_PROVIDER === "openai_web_search" || env.WEB_SEARCH_PROVIDER === "exa" || env.WEB_SEARCH_PROVIDER === "miromind_api" ? "search_scrape" : "plan",
   )
   .addEdge("plan", "search_scrape")
   .addConditionalEdges(

@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import Exa from "exa-js";
+import { Exa } from "exa-js";
 
 import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/apiError.js";

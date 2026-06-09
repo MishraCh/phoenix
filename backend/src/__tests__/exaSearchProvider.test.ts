@@ -3,8 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const answerMock = vi.fn();
 
 vi.mock("exa-js", () => ({
-  __esModule: true,
-  default: class {
+  Exa: class {
     answer = answerMock;
   },
 }));
