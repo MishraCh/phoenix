@@ -14,11 +14,18 @@ import { getToolDefinition } from "../tools/toolRegistry.js";
  */
 async function main() {
   const db = getFirebaseDb();
-  const snapshot = await db.collectionGroup("approvals").where("status", "==", "approved").get();
-  console.log(`Found ${snapshot.size} approval(s) in status "approved".`);
+  // Per-workspace queries use Firestore's automatic single-field indexes —
+  // a collectionGroup query here would require a composite index.
+  const workspaces = await db.collection("workspaces").get();
+  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  for (const ws of workspaces.docs) {
+    const snapshot = await ws.ref.collection("approvals").where("status", "==", "approved").get();
+    docs.push(...snapshot.docs);
+  }
+  console.log(`Found ${docs.length} approval(s) in status "approved" across ${workspaces.size} workspace(s).`);
 
   let fixed = 0;
-  for (const doc of snapshot.docs) {
+  for (const doc of docs) {
     const data = doc.data() as { title?: string; proposedAction?: { toolName?: string } };
     const toolName = data.proposedAction?.toolName ?? "";
     if (getToolDefinition(toolName)) {
