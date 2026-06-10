@@ -85,6 +85,11 @@ const envSchema = z.object({
   // Exa Websets requires a Pro plan. When false (default), lead datasets build via the
   // search+enrich fallback (works on any plan). Set true once Pro access exists.
   EXA_WEBSETS_ENABLED: z.string().default("false"),
+  // --- Stripe (payment gateway + integration) ---
+  STRIPE_SECRET_KEY: optionalString(),
+  STRIPE_WEBHOOK_SECRET: optionalString(),
+  STRIPE_PRICE_PLUS: optionalString(),
+  STRIPE_PRICE_PRO: optionalString(),
   GATEWAY_FAST_MODEL: z.string().default("openai/gpt-5.4-mini"),
   GATEWAY_DEFAULT_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
   GATEWAY_REASONING_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
