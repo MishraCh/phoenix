@@ -19,6 +19,8 @@ import { ExaSearchProvider } from "../web/providers/exaSearchProvider.js";
 import { ExaResearchProvider, ResearchTimeoutError } from "../web/providers/exaResearchProvider.js";
 import { ExaWebsetsProvider } from "../web/providers/exaWebsetsProvider.js";
 import { JobLockService } from "../jobs/jobLockService.js";
+import { createLlmProvider } from "../ai/providers/providerRegistry.js";
+import { mapEnrichment } from "../integrations/providers/hubspot/crmFieldMap.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
 export type ToolExecutionContext = {
@@ -119,6 +121,18 @@ const webDeepResearchInputSchema = z.object({
   query: z.string().trim().min(1),
   effort: z.enum(["low", "medium", "high"]).optional(),
 });
+
+const crmEnrichEntityInputSchema = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    domain: z.string().trim().min(1).optional(),
+    recordId: z.string().trim().min(1).optional(),
+    module: z.enum(["companies", "contacts"]).optional(),
+    fields: z.array(z.string().trim().min(1)).max(15).optional(),
+  })
+  .refine((value) => Boolean(value.name || value.domain), {
+    message: "Provide a name or domain to enrich.",
+  });
 
 const leadsBuildDatasetInputSchema = z.object({
   query: z.string().trim().min(1),
@@ -531,6 +545,56 @@ function webExtractUrlTool(context: ToolExecutionContext) {
       name: "web.extractUrl",
       description: "Extract LLM-ready content from one or more known public URLs.",
       schema: webExtractUrlInputSchema,
+    },
+  );
+}
+
+function crmEnrichEntityTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      void context;
+      const module = input.module ?? "companies";
+      const label = input.name ?? input.domain ?? "";
+      const fields =
+        input.fields?.length
+          ? input.fields
+          : module === "companies"
+            ? ["industry", "employees", "domain", "description"]
+            : ["email", "jobtitle", "company", "linkedin"];
+
+      const query = `${label}${module === "companies" ? " company" : ""} — ${fields.join(", ")}`.trim();
+      const searchResult = await new ExaSearchProvider().search({ query });
+
+      const extractionSchema = z.object({
+        fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()),
+      });
+      const extracted = await createLlmProvider("fast").generateStructured({
+        schema: extractionSchema,
+        systemPrompt:
+          "You extract structured facts about a business entity from web content. Only use facts present in the content; use null when a field is unknown.",
+        userPrompt: `Entity: ${label}\nExtract these fields: ${fields.join(", ")}\n\nWeb content:\n${searchResult.content}\n\nReturn a JSON object 'fields' mapping each requested field name to its extracted value (or null).`,
+      });
+
+      const rawFields = (extracted as { fields?: Record<string, unknown> }).fields ?? {};
+      const { properties, unmapped } = mapEnrichment(module, rawFields);
+
+      return {
+        entity: {
+          name: input.name ?? null,
+          domain: input.domain ?? null,
+          recordId: input.recordId ?? null,
+          module,
+        },
+        properties,
+        unmapped,
+        sourceRefs: searchResult.sourceRefs,
+      };
+    },
+    {
+      name: "crm.enrichEntity",
+      description:
+        "Enrich a single company or person with web data (via Exa) and return fields mapped to HubSpot properties, ready to propose as a CRM update. Pass the entity name/domain (and recordId to target an existing record).",
+      schema: crmEnrichEntityInputSchema,
     },
   );
 }
@@ -1808,6 +1872,28 @@ export const toolDefinitions: ToolDefinition[] = [
     requiresApproval: false,
     idempotencyRequired: false,
     buildTool: webExtractUrlTool,
+  },
+  {
+    name: "crm.enrichEntity",
+    description: "Enrich a company/person with web data and return HubSpot-mapped fields ready to propose as a CRM update.",
+    inputSchema: crmEnrichEntityInputSchema,
+    outputSchema: z.object({
+      entity: z.object({
+        name: z.string().nullable(),
+        domain: z.string().nullable(),
+        recordId: z.string().nullable(),
+        module: z.string(),
+      }),
+      properties: z.record(z.string(), z.unknown()),
+      unmapped: z.record(z.string(), z.unknown()),
+      sourceRefs: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["web.read", "crm.read"],
+    capabilitiesRequired: ["crm.enrichEntity"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: crmEnrichEntityTool,
   },
   {
     name: "leads.buildDataset",

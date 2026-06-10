@@ -19,6 +19,7 @@ const builtinCapabilities = [
   "web.findSimilar",
   "web.deepResearch",
   "leads.buildDataset",
+  "crm.enrichEntity",
 ];
 
 const usableIntegrationStatuses = new Set(["connected", "syncing"]);
