@@ -16,6 +16,7 @@ import { ClaimSafetyService } from "../ai/safety/claimSafetyService.js";
 import { IntegrationWorkspaceService } from "../integrations/integrationWorkspaceService.js";
 import { WebIntelligenceService } from "../web/webIntelligenceService.js";
 import { ExaSearchProvider } from "../web/providers/exaSearchProvider.js";
+import { ExaResearchProvider, ResearchTimeoutError } from "../web/providers/exaResearchProvider.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
 export type ToolExecutionContext = {
@@ -110,6 +111,11 @@ const webExtractUrlInputSchema = z.object({
 const webFindSimilarInputSchema = z.object({
   url: z.string().url(),
   numResults: z.number().int().min(1).max(20).optional(),
+});
+
+const webDeepResearchInputSchema = z.object({
+  query: z.string().trim().min(1),
+  effort: z.enum(["low", "medium", "high"]).optional(),
 });
 
 const webExtractStructuredInputSchema = z.object({
@@ -508,6 +514,46 @@ function webExtractUrlTool(context: ToolExecutionContext) {
       name: "web.extractUrl",
       description: "Extract LLM-ready content from one or more known public URLs.",
       schema: webExtractUrlInputSchema,
+    },
+  );
+}
+
+function webDeepResearchTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      void context;
+      try {
+        const result = await new ExaResearchProvider().research({
+          query: input.query,
+          effort: input.effort ?? "low",
+        });
+        return {
+          status: "completed",
+          report: result.text,
+          structured: result.structured ?? null,
+          sourceRefs: result.sourceRefs,
+        };
+      } catch (error) {
+        const isTimeout =
+          error instanceof ResearchTimeoutError ||
+          (error instanceof Error && error.name === "ResearchTimeoutError");
+        if (isTimeout) {
+          return {
+            status: "running",
+            report: "",
+            message:
+              "Deep research is taking longer than expected. Summarize what you already know and suggest the user narrow the question or try again shortly.",
+            sourceRefs: [],
+          };
+        }
+        throw error;
+      }
+    },
+    {
+      name: "web.deepResearch",
+      description:
+        "Run deep, multi-source research on a topic and return a synthesized report (optionally structured). Use for thorough analysis beyond a quick search.",
+      schema: webDeepResearchInputSchema,
     },
   );
 }
@@ -1714,6 +1760,24 @@ export const toolDefinitions: ToolDefinition[] = [
     requiresApproval: false,
     idempotencyRequired: false,
     buildTool: webExtractUrlTool,
+  },
+  {
+    name: "web.deepResearch",
+    description: "Run deep multi-source research and return a synthesized (optionally structured) report.",
+    inputSchema: webDeepResearchInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      report: z.string(),
+      structured: z.record(z.string(), z.unknown()).nullable().optional(),
+      message: z.string().optional(),
+      sourceRefs: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["web.read"],
+    capabilitiesRequired: ["web.deepResearch"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: webDeepResearchTool,
   },
   {
     name: "web.findSimilar",
