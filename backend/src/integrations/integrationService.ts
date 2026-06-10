@@ -181,6 +181,34 @@ export class IntegrationService {
   }
 
   async getIntegrationDetail(currentWorkspace: CurrentWorkspace, provider: string, userId?: string) {
+    // Not-connected is a normal state for a valid provider, not an error —
+    // return a disconnected skeleton instead of a 404 so detail pages can
+    // render their connect UI without error-handling gymnastics.
+    const normalized = normalizeIntegrationProviderId(provider);
+    const existing = await this.getIntegration(currentWorkspace, normalized);
+    if (!existing) {
+      return {
+        id: normalized,
+        provider: normalized,
+        status: "disconnected" as const,
+        capabilities: [],
+        scopes: [],
+        scopesGranted: [],
+        lastSyncedAt: null,
+        syncError: null,
+        ownedByUserId: null,
+        connectedBy: "",
+        reconnectReason: null,
+        lastErrorCode: null,
+        accountEmail: null,
+        watchStatus: null,
+        watchExpiration: null,
+        lastDeltaSyncedAt: null,
+        fullResyncRequired: false,
+        items: [],
+      };
+    }
+
     const integration = await this.requireConnection(currentWorkspace, provider);
     const canAccessContent = this.canAccessGmailContent(userId, integration);
     const recentItems = canAccessContent
