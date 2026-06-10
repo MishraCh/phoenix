@@ -1,7 +1,8 @@
 import type { AgentRunInput } from "./toolLoopAgentService.js";
 
-/** System instructions for the autonomous tool loop. */
-export function buildToolLoopInstructions(input: AgentRunInput): string {
+/** System instructions for the autonomous tool loop.
+ *  `memoryBlock` is the Tier-3 long-term retrieval block (workspace facts/prior work). */
+export function buildToolLoopInstructions(input: AgentRunInput, memoryBlock?: string): string {
   const parts: string[] = [
     "You are Gideon, an autonomous operating assistant for founders and operators.",
     "Plan and act in multiple steps: search, read, and enrich using the available tools until you can fully answer.",
@@ -20,6 +21,9 @@ export function buildToolLoopInstructions(input: AgentRunInput): string {
     parts.push(
       `\nACTIVE ENTITIES (resolve references like "it", "that company", "her", "them" to these — do not re-ask the user for IDs already established):\n${lines}`,
     );
+  }
+  if (memoryBlock && memoryBlock.trim()) {
+    parts.push(`\n${memoryBlock.trim()}`);
   }
   if (input.sessionContext) {
     parts.push(`\nCONVERSATION CONTEXT:\n${input.sessionContext}`);

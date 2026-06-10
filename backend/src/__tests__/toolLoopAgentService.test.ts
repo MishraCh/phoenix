@@ -26,6 +26,10 @@ vi.mock("../tools/toolRegistryService.js", () => ({
   },
 }));
 
+vi.mock("../ai/retrieval/agentMemoryContext.js", () => ({
+  buildAgentMemoryBlock: vi.fn().mockResolvedValue(""),
+}));
+
 vi.mock("../policy/policyService.js", () => ({
   PolicyService: class {
     evaluateAction = () => ({ status: "allowed", requiresApproval: false, reason: "" });

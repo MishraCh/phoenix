@@ -10,6 +10,7 @@ import type { CurrentWorkspace } from "../../services/currentWorkspaceService.js
 import type { SourceRef } from "../../schemas/coreSchemas.js";
 import { adaptToolForAgent } from "./toolLoopToolAdapter.js";
 import { buildToolLoopInstructions } from "./toolLoopPrompts.js";
+import { buildAgentMemoryBlock } from "../retrieval/agentMemoryContext.js";
 
 /** A resolved entity carried in session state for reference resolution. */
 export type ActiveEntity = { label: string; objectType?: string; id?: string };
@@ -106,10 +107,13 @@ export class ToolLoopAgentService {
       { role: "user" as const, content: input.input },
     ];
 
+    // Tier-3 long-term memory: retrieve relevant workspace facts/prior work.
+    const memoryBlock = await buildAgentMemoryBlock(this.db, input.currentWorkspace.id, input.input);
+
     try {
       const agent = new ToolLoopAgent({
         model: env.GATEWAY_DEFAULT_MODEL,
-        instructions: buildToolLoopInstructions(input),
+        instructions: buildToolLoopInstructions(input, memoryBlock),
         tools,
         stopWhen: stepCountIs(maxSteps),
         onStepFinish: collectFromStep,
