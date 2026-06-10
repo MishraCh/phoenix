@@ -22,7 +22,7 @@ import {
 import { validateRequest } from "../utils/validateRequest.js";
 
 const providerParamsSchema = z.object({
-  provider: z.enum(["gmail", "google", "microsoft", "hubspot", "salesforce", "zoho", "slack", "notion", "drive"]),
+  provider: z.enum(["gmail", "google", "microsoft", "hubspot", "salesforce", "zoho", "slack", "notion", "drive", "stripe"]),
 });
 const providerItemParamsSchema = providerParamsSchema.extend({
   itemId: z.string().min(1),

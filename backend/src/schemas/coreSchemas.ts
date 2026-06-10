@@ -20,6 +20,7 @@ export const integrationProviderSchema = z.enum([
   "slack",
   "notion",
   "drive",
+  "stripe",
 ]);
 export const integrationStatusSchema = z.preprocess((value) => {
   if (value === "needs_reconnect") {
@@ -115,11 +116,14 @@ export const workspaceSchema = z.object({
   slug: z.string().optional(),
   ownerId: z.string().min(1),
   plan: planSchema,
-  planSource: z.enum(["system", "coupon", "manual"]),
+  planSource: z.enum(["system", "coupon", "manual", "stripe"]),
   planExpiresAt: firestoreTimestampSchema.optional(),
   monthlyCreditsLimit: z.number().int().nonnegative(),
   monthlyCreditsUsed: z.number().int().nonnegative(),
   billingCycleStartAt: firestoreTimestampSchema,
+  /** Stripe billing linkage (set by checkout webhook fulfillment) */
+  stripeCustomerId: z.string().optional(),
+  stripeSubscriptionId: z.string().optional(),
   defaultContextBundleId: z.string().optional(),
   /** Structured AI context about this workspace's business identity */
   profile: workspaceProfileSchema.optional(),
