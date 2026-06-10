@@ -46,6 +46,8 @@ export class OpenAILlmProvider implements LLMProvider {
         schema: input.schema,
         system: input.systemPrompt,
         prompt: input.userPrompt,
+        // Plan schemas use optionals/records that strict json_schema rejects.
+        providerOptions: { openai: { strictJsonSchema: false } },
         ...(maxOutputTokens ? { maxOutputTokens } : {}),
         ...(execution ? { abortSignal: execution.signal } : {}),
       });

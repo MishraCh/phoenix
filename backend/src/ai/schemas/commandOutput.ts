@@ -47,7 +47,9 @@ export const commandPlanSchema = z.object({
       type: z.enum(["email_send", "crm_update", "crm_create", "slack_message", "task_create", "other"]),
       actionType: z.string().min(1),
       toolName: z.string().min(1),
-      input: z.record(z.string(), z.any()).optional(),
+      // looseObject (not z.record): record schemas emit `propertyNames`, which
+      // strict structured-output providers reject (Gateway/OpenAI response_format).
+      input: z.looseObject({}).optional(),
       riskLevel: z.enum(["low", "medium", "high", "critical"]),
     })
     .nullish(),
@@ -86,7 +88,7 @@ export const commandPlanSchema = z.object({
           "integration.action",
         ]),
         name: z.string(),
-        config: z.record(z.string(), z.any()),
+        config: z.looseObject({}),
         order: z.number().int().nonnegative().optional(),
         inputStepIds: z.array(z.string().min(1)).optional(),
       })).describe(

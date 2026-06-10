@@ -51,6 +51,10 @@ export class GatewayLlmProvider implements LLMProvider {
         schema: input.schema,
         system: input.systemPrompt,
         prompt: input.userPrompt,
+        // Our plan schemas use optionals/records that OpenAI's STRICT json_schema
+        // rejects ('required'/'propertyNames' violations). The Gateway can route or
+        // fall back to OpenAI even for anthropic/* models — keep strict mode off.
+        providerOptions: { openai: { strictJsonSchema: false } },
         ...(maxOutputTokens ? { maxOutputTokens } : {}),
         ...(execution ? { abortSignal: execution.signal } : {}),
       });

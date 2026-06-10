@@ -1,6 +1,7 @@
 import { embedMany } from "ai";
 
 import { env } from "../../config/env.js";
+import { logger } from "../../observability/logger.js";
 import { ApiError } from "../../utils/apiError.js";
 import type { EmbeddingProvider } from "./embeddingProvider.js";
 
@@ -27,12 +28,24 @@ export class GatewayEmbeddingProvider implements EmbeddingProvider {
       });
     }
 
-    const { embeddings } = await embedMany({
-      model: this.modelName,
-      values: texts,
-      providerOptions: { openai: { dimensions: this.dimensions } },
-    });
-
-    return embeddings;
+    try {
+      const { embeddings } = await embedMany({
+        model: this.modelName,
+        values: texts,
+        providerOptions: { openai: { dimensions: this.dimensions } },
+      });
+      return embeddings;
+    } catch (error) {
+      // The Gateway can lose access to embedding models (plan/project gating).
+      // Fall back to direct OpenAI so retrieval keeps working.
+      if (env.OPENAI_API_KEY) {
+        logger.warn("Gateway embeddings failed — falling back to direct OpenAI", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const { OpenAIEmbeddingProvider } = await import("./openAIEmbeddingProvider.js");
+        return new OpenAIEmbeddingProvider().embed(texts);
+      }
+      throw error;
+    }
   }
 }
