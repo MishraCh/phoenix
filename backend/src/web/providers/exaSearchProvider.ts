@@ -24,6 +24,24 @@ function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** Build a web SourceRef, returning null for malformed URLs (Exa occasionally
+ *  returns non-URL citation strings — one bad citation must not fail the search). */
+function toWebSourceRef(url: unknown, title: unknown, providerName: string): SourceRef | null {
+  if (typeof url !== "string") return null;
+  try {
+    return sourceRefSchema.parse({
+      sourceType: "web",
+      sourceId: hashValue(`${providerName}:${url}`),
+      title: typeof title === "string" && title ? title : "Web result",
+      url,
+      fetchedAt: Timestamp.now(),
+      provider: providerName,
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Web search provider backed by Exa's grounded /answer endpoint.
  * Returns a synthesized, citation-backed answer plus web SourceRefs — a
@@ -66,16 +84,9 @@ export class ExaSearchProvider {
 
       return {
         content: answer,
-        sourceRefs: uniqueCitations.map((citation) =>
-          sourceRefSchema.parse({
-            sourceType: "web",
-            sourceId: hashValue(`exa_search:${citation.url}`),
-            title: citation.title ?? "Web result",
-            url: citation.url,
-            fetchedAt: Timestamp.now(),
-            provider: "exa_search",
-          }),
-        ),
+        sourceRefs: uniqueCitations
+          .map((citation) => toWebSourceRef(citation.url, citation.title, "exa_search"))
+          .filter((ref): ref is SourceRef => ref !== null),
       };
     } catch (error) {
       logger.warn("Exa search failed", {
@@ -113,17 +124,8 @@ export class ExaSearchProvider {
 
       const results = Array.isArray(response.results) ? response.results : [];
       return results
-        .filter((result): result is { url: string; title?: string } => typeof result.url === "string")
-        .map((result) =>
-          sourceRefSchema.parse({
-            sourceType: "web",
-            sourceId: hashValue(`exa_find_similar:${result.url}`),
-            title: result.title ?? "Related result",
-            url: result.url,
-            fetchedAt: Timestamp.now(),
-            provider: "exa_find_similar",
-          }),
-        );
+        .map((result) => toWebSourceRef(result.url, result.title, "exa_find_similar"))
+        .filter((ref): ref is SourceRef => ref !== null);
     } catch (error) {
       logger.warn("Exa find-similar failed", {
         error: error instanceof Error ? error.message : String(error),

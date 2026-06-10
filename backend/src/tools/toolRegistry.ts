@@ -579,17 +579,21 @@ function crmEnrichEntityTool(context: ToolExecutionContext) {
       const query = `${label}${module === "companies" ? " company" : ""} — ${fields.join(", ")}`.trim();
       const searchResult = await new ExaSearchProvider().search({ query });
 
+      // Array-of-pairs (not z.record) — open-ended dict schemas are rejected by strict structured output.
       const extractionSchema = z.object({
-        fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()),
+        fields: z.array(z.object({ name: z.string(), value: z.string().nullable() })),
       });
       const extracted = await createLlmProvider("fast").generateStructured({
         schema: extractionSchema,
         systemPrompt:
-          "You extract structured facts about a business entity from web content. Only use facts present in the content; use null when a field is unknown.",
-        userPrompt: `Entity: ${label}\nExtract these fields: ${fields.join(", ")}\n\nWeb content:\n${searchResult.content}\n\nReturn a JSON object 'fields' mapping each requested field name to its extracted value (or null).`,
+          "You extract structured facts about a business entity from web content. Only use facts present in the content; set value to null when a field is unknown.",
+        userPrompt: `Entity: ${label}\nExtract these fields: ${fields.join(", ")}\n\nWeb content:\n${searchResult.content}\n\nReturn 'fields' as an array of { name, value } — one entry per requested field (value null if unknown).`,
       });
 
-      const rawFields = (extracted as { fields?: Record<string, unknown> }).fields ?? {};
+      const rawFields: Record<string, unknown> = {};
+      for (const field of (extracted as { fields?: Array<{ name?: string; value?: unknown }> }).fields ?? []) {
+        if (field?.name) rawFields[field.name] = field.value ?? null;
+      }
       const { properties, unmapped } = mapEnrichment(module, rawFields);
 
       return {

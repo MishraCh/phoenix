@@ -27,7 +27,12 @@ describe("crm.enrichEntity tool", () => {
       content: "Acme AI is a SaaS company with ~200 employees.",
       sourceRefs: [{ sourceType: "web", sourceId: "s1", url: "https://acme.ai", provider: "exa_search" }],
     });
-    generateStructuredMock.mockResolvedValue({ fields: { industry: "SaaS", employees: 200 } });
+    generateStructuredMock.mockResolvedValue({
+      fields: [
+        { name: "industry", value: "SaaS" },
+        { name: "employees", value: "200" },
+      ],
+    });
 
     const tool = getToolDefinition("crm.enrichEntity")!.buildTool(ctx);
     const out = (await tool.invoke({
@@ -42,7 +47,7 @@ describe("crm.enrichEntity tool", () => {
     };
 
     expect(out.entity.recordId).toBe("501");
-    expect(out.properties).toEqual({ industry: "SaaS", numberofemployees: 200 });
+    expect(out.properties).toEqual({ industry: "SaaS", numberofemployees: "200" });
     expect(out.sourceRefs).toHaveLength(1);
     expect(searchMock).toHaveBeenCalled();
   });
