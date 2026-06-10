@@ -29,7 +29,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIntegrationDetailQuery } from "@/hooks/useGideonQueries";
 import { getFriendlyErrorMessage } from "@/lib/product";
 import { fallbackIntegrations, type IntegrationDetail } from "@/services/integrations";
-import { connectIntegration, disconnectIntegration } from "@/services/integrations";
+import { connectIntegration, connectStripeWithKey, disconnectIntegration } from "@/services/integrations";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 type IntegrationDetailPageProps = {
   provider: string;
@@ -118,6 +120,8 @@ export function IntegrationDetailPage({ provider }: IntegrationDetailPageProps) 
   const isComingSoon = normalizedProvider === "gmail";
   const { idToken } = useAuth();
   const { pushToast } = useToast();
+  const [stripeKey, setStripeKey] = useState("");
+  const [stripeConnecting, setStripeConnecting] = useState(false);
   const integrationQuery = useIntegrationDetailQuery(normalizedProvider);
   const fallbackIntegration = fallbackIntegrations.find((item) => item.provider === normalizedProvider) ?? fallbackIntegrations[0];
   const integration = (integrationQuery.data ??
@@ -207,12 +211,42 @@ export function IntegrationDetailPage({ provider }: IntegrationDetailPageProps) 
                 </p>
               </div>
             ) : normalizedProvider === "stripe" ? (
-              <Button asChild size="lg" className="mt-4 rounded-full shadow-md px-8">
-                <Link href="/integrations/stripe/workspace">
-                  Connect with API key
-                  <ArrowRight className="ml-2 size-4" />
-                </Link>
-              </Button>
+              <div className="mt-4 w-full max-w-md space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    value={stripeKey}
+                    onChange={(event) => setStripeKey(event.target.value)}
+                    placeholder="rk_test_… or sk_test_…"
+                    className="h-11 flex-1 rounded-full bg-white px-4 font-mono text-sm shadow-sm"
+                  />
+                  <Button
+                    size="lg"
+                    className="rounded-full px-6 shadow-md"
+                    disabled={!idToken || stripeConnecting || !stripeKey.trim()}
+                    onClick={async () => {
+                      if (!idToken) return;
+                      setStripeConnecting(true);
+                      try {
+                        await connectStripeWithKey(idToken, stripeKey.trim());
+                        pushToast({ title: "Stripe connected", description: "Revenue insights and payment links unlocked.", tone: "success" });
+                        setStripeKey("");
+                        void integrationQuery.refetch();
+                      } catch (err) {
+                        pushToast({ title: "Connection failed", description: getFriendlyErrorMessage(err, "Stripe rejected that key."), tone: "error" });
+                      } finally {
+                        setStripeConnecting(false);
+                      }
+                    }}
+                  >
+                    {stripeConnecting ? "Connecting…" : "Connect"}
+                  </Button>
+                </div>
+                <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                  <LockKeyhole className="size-3.5" />
+                  Paste a test-mode restricted key from your Stripe dashboard — stored encrypted, used server-side only.
+                </p>
+              </div>
             ) : (
               <Button size="lg" className="mt-4 rounded-full shadow-md px-8" onClick={() => void handleConnect()} disabled={!idToken}>
                 Connect {meta?.label ?? provider}

@@ -33,6 +33,13 @@ import { InlineStatusBanner, PageSection, SummaryRow } from "./ProductPrimitives
 
 const providerCatalog = [
   {
+    category: "Available now",
+    items: [
+      { id: "hubspot", name: "HubSpot", icon: Database, iconBg: "bg-[#FF7A59]", iconText: "text-white", unlocks: ["Lead context", "Pipeline visibility", "Notes and tasks", "Approval-gated CRM actions"], desc: "Bring in deal context, contact history, and CRM execution support for sales workflows." },
+      { id: "stripe", name: "Stripe", icon: CreditCard, iconBg: "bg-[#635BFF]", iconText: "text-white", unlocks: ["Revenue insights", "Agent-queryable payments", "Approval-gated payment links"], desc: "Connect Stripe so Gideon can answer revenue questions and create payment links with your approval." },
+    ]
+  },
+  {
     category: "Communication",
     items: [
       { id: "gmail", name: "Gmail", icon: Mail, iconBg: "bg-[#4285F4]", iconText: "text-white", unlocks: ["Inbox triage", "Draft follow-up", "Thread context", "Coming soon"], desc: "Gmail is coming soon — Gideon will summarize threads, draft replies, and turn email into workflows." },
@@ -49,9 +56,7 @@ const providerCatalog = [
   {
     category: "CRM & Finance",
     items: [
-      { id: "hubspot", name: "HubSpot", icon: Database, iconBg: "bg-[#FF7A59]", iconText: "text-white", unlocks: ["Lead context", "Pipeline visibility", "Notes and tasks", "Approval-gated CRM actions"], desc: "Bring in deal context, contact history, and CRM execution support for sales workflows." },
       { id: "salesforce", name: "Salesforce", icon: Cloud, iconBg: "bg-[#00A1E0]", iconText: "text-white", unlocks: ["Account updates", "Opportunity tracking", "Coming soon"], desc: "Connect Salesforce for enterprise CRM context." },
-      { id: "stripe", name: "Stripe", icon: CreditCard, iconBg: "bg-[#635BFF]", iconText: "text-white", unlocks: ["Revenue insights", "Agent-queryable payments", "Approval-gated payment links"], desc: "Connect Stripe so Gideon can answer revenue questions and create payment links with your approval." },
     ]
   },
   {
@@ -128,8 +133,12 @@ export function IntegrationsPage() {
       {!loading ? (
         <div className="space-y-8 mt-2">
           {(() => {
+            // Only live providers belong here — stale docs for coming-soon
+            // providers (e.g. an old expired Gmail connection) stay hidden.
+            const READY_PROVIDERS = new Set(["hubspot", "stripe"]);
             const activeIntegrations = providerCatalog
               .flatMap((category) => category.items)
+              .filter((provider) => READY_PROVIDERS.has(provider.id))
               .filter((provider) =>
                 integrations.some(
                   (integration) =>
@@ -159,7 +168,7 @@ export function IntegrationsPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-medium text-foreground">{provider.name}</p>
-                                  {liveIntegration ? <StatusPill status={liveIntegration.status} /> : <StatusPill status="planned" />}
+                                  {isWorkspaceReady && liveIntegration ? <StatusPill status={liveIntegration.status} /> : null}
                                 </div>
                                 <p className="mt-0.5 text-xs leading-5 text-muted-foreground line-clamp-1">{provider.desc}</p>
                               </div>
@@ -191,9 +200,7 @@ export function IntegrationsPage() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {category.items.map((provider) => {
                         const liveIntegration =
-                          integrations.find((integration) => integration.provider === provider.id) ??
-                          fallbackIntegrations.find((integration) => integration.provider === provider.id) ??
-                          null;
+                          integrations.find((integration) => integration.provider === provider.id) ?? null;
                         const isWorkspaceReady = provider.id === "hubspot" || provider.id === "stripe";
 
                         return (
@@ -205,7 +212,7 @@ export function IntegrationsPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-medium text-foreground">{provider.name}</p>
-                                  {liveIntegration ? <StatusPill status={liveIntegration.status} /> : <StatusPill status="planned" />}
+                                  {isWorkspaceReady && liveIntegration ? <StatusPill status={liveIntegration.status} /> : null}
                                 </div>
                                 <p className="mt-0.5 text-xs leading-5 text-muted-foreground line-clamp-1">{provider.desc}</p>
                               </div>
