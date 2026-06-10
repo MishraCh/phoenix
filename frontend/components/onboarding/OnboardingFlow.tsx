@@ -570,7 +570,7 @@ export function OnboardingFlow() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            <Image src="/logo.svg" alt="Gideon" width={64} height={64} className="rounded-xl" priority />
+            <Image src="/phoenix-ai.png" alt="Phoenix AI" width={64} height={64} className="rounded-xl" priority />
             <StepDots current={step} />
           </motion.div>
         )}
@@ -608,7 +608,7 @@ export function OnboardingFlow() {
                       animate={{ scale: [1, 1.12, 1], opacity: [0.7, 0, 0.7] }}
                       transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: 0.3 }}
                     />
-                    <Image src="/logo.svg" alt="Gideon" width={96} height={96} className="relative rounded-[18px] shadow-md" priority />
+                    <Image src="/phoenix-ai.png" alt="Phoenix AI" width={96} height={96} className="relative rounded-[18px] shadow-md" priority />
                   </motion.div>
 
                   <motion.h1

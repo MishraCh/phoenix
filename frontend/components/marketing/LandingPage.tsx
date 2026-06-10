@@ -116,7 +116,7 @@ const securityCards = [
   { title: "Role permissions", body: "Granular RBAC with workspace scoping.", icon: ShieldCheck },
   { title: "Approval systems", body: "Human-in-the-loop for every execution.", icon: BadgeCheck },
   { title: "Private deployment", body: "VPC-isolated, single-tenant available.", icon: Workflow },
-  { title: "On-premise deployment", body: "Run Gideon entirely inside your infra.", icon: Lock },
+  { title: "On-premise deployment", body: "Run Phoenix entirely inside your infra.", icon: Lock },
 ] as const;
 
 const testimonials = [
@@ -143,6 +143,11 @@ const testimonials = [
 ] as const;
 
 const faqs = [
+  {
+    question: "What is the difference between Phoenix and Gideon?",
+    answer:
+      "Phoenix is the workspace platform — sessions, workflows, approvals, integrations, and billing. Gideon is the agentic AI brain inside Phoenix: it does the research, reasoning, drafting, and coordination, and proposes external actions for your approval.",
+  },
   {
     question: "What does Gideon actually do",
     answer:
@@ -593,15 +598,18 @@ export function LandingPage() {
     <div className={cn("bg-white text-[#0A0A0A]", outfit.variable, inter.variable, mono.variable)}>
       <header className="sticky top-0 z-50 border-b border-[rgba(229,229,229,0.8)] bg-white/75 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center justify-between gap-6 px-5 lg:px-10">
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center gap-2.5">
             <Image
-              src="/logo.svg"
-              alt="Gideon"
-              width={118}
-              height={33}
-              className="h-[33px] w-auto"
+              src="/phoenix-ai.png"
+              alt="Phoenix AI"
+              width={36}
+              height={36}
+              className="h-9 w-9"
               priority
             />
+            <span className={cn("text-[1.45rem] tracking-[-0.04em] text-[#0A0A0A]", outfit.className)}>
+              Phoenix <span className="text-[#5B50DC]">AI</span>
+            </span>
           </Link>
 
           <nav className={cn("hidden items-center gap-8 text-sm text-[#525252] lg:flex", inter.className)}>
@@ -614,7 +622,7 @@ export function LandingPage() {
 
           <div className={cn("flex items-center gap-2 text-sm", inter.className)}>
             <Link href="/auth" className="rounded-full px-4 py-2 text-[#404040] transition duration-300 hover:-translate-y-0.5 hover:bg-[#F5F5F5] hover:text-[#0A0A0A]">
-              Try Gideon
+              Try Phoenix
             </Link>
             <Link href="/auth" className="group inline-flex items-center gap-2 rounded-full bg-[#0A0A0A] px-4 py-2 font-medium text-white shadow-[0_12px_30px_-18px_rgba(10,10,10,0.55)] transition duration-300 hover:-translate-y-0.5 hover:bg-black hover:shadow-[0_20px_36px_-18px_rgba(10,10,10,0.52)]">
               Hire Gideon
@@ -667,7 +675,7 @@ export function LandingPage() {
                     href="/auth"
                     className="group inline-flex items-center gap-2 rounded-full border border-[#D4D4D4] px-6 py-3.5 text-sm font-medium text-[#262626] shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-[#A3A3A3] hover:bg-white"
                   >
-                    Try Gideon
+                    Try Phoenix
                     <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </Link>
 
@@ -1074,7 +1082,7 @@ export function LandingPage() {
               Simple, workspace pricing
             </h2>
             <p className={cn("mt-4 text-[17px] leading-[1.72] text-[#5F5F68] lg:text-[18px]", inter.className)}>
-              Every plan includes the full Gideon experience — agents, workflows, and approvals. Scale credits and seats as you grow.
+              Every plan includes the full Phoenix experience — agents, workflows, and approvals. Scale credits and seats as you grow.
             </p>
           </div>
 
@@ -1085,7 +1093,7 @@ export function LandingPage() {
                 price: "$0",
                 cadence: "forever",
                 highlight: false,
-                blurb: "For trying Gideon on real work.",
+                blurb: "For trying Phoenix on real work.",
                 features: ["1 seat", "50 AI credits / month", "1 integration", "Core agents & workflows", "Approval-gated actions"],
               },
               {
@@ -1173,11 +1181,13 @@ export function LandingPage() {
         <div className="mx-auto grid max-w-[1280px] gap-12 px-5 py-16 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto] lg:px-10">
           <div>
             <div className="flex items-center gap-3">
-              <Image src="/logo.svg" alt="Gideon" width={34} height={34} className="rounded-xl" />
-              <span className={cn("text-[1.6rem] tracking-[-0.04em] text-[#0A0A0A]", outfit.className)}>Gideon</span>
+              <Image src="/phoenix-ai.png" alt="Phoenix AI" width={34} height={34} />
+              <span className={cn("text-[1.6rem] tracking-[-0.04em] text-[#0A0A0A]", outfit.className)}>
+                Phoenix <span className="text-[#5B50DC]">AI</span>
+              </span>
             </div>
-            <p className={cn("mt-4 max-w-[13rem] text-[14px] leading-7 text-[#737373]", inter.className)}>
-              Gideon - The operational AI layer for modern companies.
+            <p className={cn("mt-4 max-w-[14rem] text-[14px] leading-7 text-[#737373]", inter.className)}>
+              Phoenix — the operational AI platform for modern companies, powered by Gideon.
             </p>
           </div>
 
@@ -1209,7 +1219,7 @@ export function LandingPage() {
 
         <div className="border-t border-[rgba(229,229,229,0.8)]">
           <div className={cn("mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-4 px-5 py-6 text-xs text-[#A3A3A3] md:flex-row md:items-center lg:px-10", inter.className)}>
-            <span>© 2026 Gideon. All rights reserved.</span>
+            <span>© 2026 Phoenix AI. All rights reserved.</span>
             <div className="flex items-center gap-4">
               <a href="#" className="transition hover:text-[#737373]">Privacy</a>
               <a href="#" className="transition hover:text-[#737373]">Terms &amp; condition</a>

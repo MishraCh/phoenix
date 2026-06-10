@@ -27,8 +27,8 @@ type AuthMode = "signin" | "signup";
 type StatusTone = "neutral" | "success" | "error";
 
 const DEFAULT_STATUS: Record<AuthMode, string> = {
-  signin: "Sign in to continue into your Gideon workspace.",
-  signup: "Create your account to start building your Gideon workspace.",
+  signin: "Sign in to continue into your Phoenix workspace.",
+  signup: "Create your account to start building your Phoenix workspace.",
 };
 
 function GoogleIcon() {
@@ -395,7 +395,12 @@ export function AuthPage() {
         <div className="relative flex min-h-screen flex-col bg-white lg:min-h-0 lg:overflow-hidden">
           <div className="mx-auto flex w-full max-w-[34rem] flex-1 flex-col px-6 py-6 sm:px-8 lg:justify-between lg:px-10 lg:py-7">
             <div className="flex items-center justify-between">
-              <Image src="/logo.svg" alt="Gideon" width={180} height={51} className="h-auto w-[8.8rem] sm:w-[10rem]" priority />
+              <span className="flex items-center gap-2.5">
+                <Image src="/phoenix-ai.png" alt="Phoenix AI" width={38} height={38} className="h-9 w-9 sm:h-10 sm:w-10" priority />
+                <span className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[#0B1C30] sm:text-[1.5rem]">
+                  Phoenix <span className="text-[#3525CD]">AI</span>
+                </span>
+              </span>
               <div className="rounded-full border border-[#E4E2F4] bg-[#F7F7FD] p-1 shadow-[0_10px_25px_-22px_rgba(53,37,205,0.45)]">
                 <div className="relative grid grid-cols-2 gap-1">
                   {(["signin", "signup"] as const).map((nextMode) => (
@@ -437,7 +442,7 @@ export function AuthPage() {
                       </h1>
                       <p className="mt-2.5 max-w-[29rem] text-[0.99rem] leading-7 text-[#5F6072]">
                         {mode === "signin"
-                          ? "Sign in to continue to Gideon and pick up where your team left off."
+                          ? "Sign in to continue to Phoenix and pick up where your team left off."
                           : "Set up your account and start operating from one unified workspace."}
                       </p>
                     </motion.div>
@@ -505,7 +510,7 @@ export function AuthPage() {
                         transition={{ duration: 0.2, ease: "easeOut" }}
                         className="rounded-xl border border-dashed border-[#DAD7EF] bg-[#FAFAFF] px-4 py-3.5 text-sm leading-6 text-[#6A6880]"
                       >
-                        Use your workspace email and password to continue into Gideon.
+                        Use your workspace email and password to continue into Phoenix.
                       </motion.div>
                     )}
                   </AnimatePresence>

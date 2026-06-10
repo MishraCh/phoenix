@@ -48,12 +48,11 @@ export function FullscreenLoader({ title, description, steps }: FullscreenLoader
         <div className="relative mb-8">
           <div className="flex size-16 items-center justify-center rounded-2xl border border-border/60 bg-white shadow-panel">
             <Image
-              src="/logo.svg"
-              alt="Gideon"
+              src="/phoenix-ai.png"
+              alt="Phoenix AI"
               width={44}
               height={44}
-              className="h-10 w-auto object-contain"
-              style={{ mixBlendMode: "multiply" }}
+              className="h-10 w-10 object-contain"
               priority
             />
           </div>

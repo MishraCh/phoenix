@@ -8,17 +8,18 @@
     --foreground: 240 50% 10%;
     --card: 0 0% 100%;
     --card-foreground: 240 50% 10%;
-    --primary: 252 87% 53%;
+    /* Phoenix brand: indigo→violet gradient from the logomark */
+    --primary: 246 65% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 230 40% 96%;
-    --secondary-foreground: 240 50% 30%;
-    --muted: 230 30% 92%;
-    --muted-foreground: 230 20% 45%;
-    --accent: 240 80% 94%;
-    --accent-foreground: 252 87% 53%;
-    --border: 230 30% 90%;
-    --input: 230 30% 90%;
-    --ring: 252 87% 53%;
+    --secondary: 240 40% 96%;
+    --secondary-foreground: 244 45% 30%;
+    --muted: 240 30% 92%;
+    --muted-foreground: 240 18% 45%;
+    --accent: 244 75% 94%;
+    --accent-foreground: 246 65% 52%;
+    --border: 240 28% 90%;
+    --input: 240 28% 90%;
+    --ring: 246 65% 56%;
     --radius: 0.5rem;
 
     /* ── Shadow scale ───────────────────────────────────────── */

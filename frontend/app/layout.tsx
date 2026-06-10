@@ -27,8 +27,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gideon",
-  description: "Gideon is your AI Chief of Staff workspace for decisions, follow-through, and operating rhythm.",
+  title: "Phoenix AI",
+  description:
+    "Phoenix is the AI Chief of Staff workspace for decisions, follow-through, and operating rhythm — powered by Gideon, its agentic brain.",
 };
 
 type RootLayoutProps = {
