@@ -5,6 +5,7 @@ import { authMiddleware } from "../auth/authMiddleware.js";
 import {
   analyzeGmailStyleProfile,
   connectIntegration,
+  connectStripeWithKey,
   deleteGmailStyleProfile,
   disconnectIntegration,
   getGmailStyleProfile,
@@ -60,6 +61,12 @@ integrationsRouter.post(
   authMiddleware,
   validateRequest({ params: providerParamsSchema }),
   connectIntegration,
+);
+integrationsRouter.post(
+  "/integrations/stripe/connect-key",
+  authMiddleware,
+  validateRequest({ body: z.object({ apiKey: z.string().trim().min(12).max(200) }) }),
+  connectStripeWithKey,
 );
 integrationsRouter.get(
   "/integrations/:provider/callback",

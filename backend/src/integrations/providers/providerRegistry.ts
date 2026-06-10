@@ -5,13 +5,14 @@ import { ApiError } from "../../utils/apiError.js";
 import type { IntegrationProvider } from "../core/integrationContracts.js";
 import { GmailProvider } from "./gmail/gmailProvider.js";
 import { HubSpotProvider } from "./hubspot/hubspotProvider.js";
+import { StripeProvider } from "./stripe/stripeProvider.js";
 
 export function normalizeIntegrationProviderId(provider: string): IntegrationProviderId {
   if (provider === "google") {
     return "gmail";
   }
 
-  if (provider === "gmail" || provider === "hubspot") {
+  if (provider === "gmail" || provider === "hubspot" || provider === "stripe") {
     return provider;
   }
 
@@ -45,6 +46,10 @@ export function createIntegrationProvider(
 
   if (normalized === "hubspot") {
     return new HubSpotProvider(db);
+  }
+
+  if (normalized === "stripe") {
+    return new StripeProvider(db);
   }
 
   throw new ApiError({

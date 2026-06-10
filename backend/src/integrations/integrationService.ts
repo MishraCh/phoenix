@@ -220,6 +220,68 @@ export class IntegrationService {
     });
   }
 
+  /** Connect Stripe with a (restricted) API key — no OAuth. Validates the key live. */
+  async connectStripeWithApiKey(currentWorkspace: CurrentWorkspace, userId: string, apiKey: string) {
+    const { validateStripeApiKey, STRIPE_CAPABILITIES } = await import("./providers/stripe/stripeProvider.js");
+
+    const existingIntegration = await this.getIntegration(currentWorkspace, "stripe");
+    await new UsageService(this.db).assertIntegrationLimit(
+      currentWorkspace.workspace,
+      existingIntegration?.provider ?? null,
+    );
+
+    await validateStripeApiKey(apiKey);
+
+    const integrationRef = this.collection(currentWorkspace.id).doc("stripe");
+    const now = Timestamp.now();
+    const existing = await integrationRef.get();
+
+    const integration = integrationSchema.parse({
+      id: "stripe",
+      workspaceId: currentWorkspace.id,
+      provider: "stripe",
+      status: "connected",
+      scopes: [],
+      scopesGranted: [],
+      tokenRef: integrationRef.path,
+      capabilities: STRIPE_CAPABILITIES,
+      syncError: null,
+      connectedBy: userId,
+      ownedByUserId: userId,
+      lastSuccessfulRefreshAt: now,
+      syncStatus: "idle",
+      connectionGeneration:
+        typeof existing.data()?.["connectionGeneration"] === "number"
+          ? Number(existing.data()?.["connectionGeneration"]) + 1
+          : 1,
+      createdAt: existing.exists ? existing.data()?.["createdAt"] ?? now : now,
+      updatedAt: now,
+    });
+
+    await integrationRef.set(
+      {
+        ...integration,
+        encryptedToken: encryptJson({ raw: { apiKey } }),
+      },
+      { merge: true },
+    );
+
+    invalidateCachedCapabilities(currentWorkspace.id);
+    invalidateCachedIntegrationsCount(currentWorkspace.id);
+
+    await this.activityService.createEvent({
+      workspaceId: currentWorkspace.id,
+      type: existing.exists ? "integration.reconnected" : "integration.connected",
+      title: existing.exists ? "Stripe reconnected" : "Stripe connected",
+      actorType: "user",
+      actorId: userId,
+      related: { integrationId: "stripe" },
+      metadata: { provider: "stripe" },
+    });
+
+    return { status: "connected" as const };
+  }
+
   async handleOAuthCallback(
     providerId: string,
     input: { code?: string; state?: string; error?: string },

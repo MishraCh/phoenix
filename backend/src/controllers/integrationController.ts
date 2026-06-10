@@ -82,6 +82,15 @@ export async function connectIntegration(request: Request, response: Response) {
   response.json(result);
 }
 
+export async function connectStripeWithKey(request: Request, response: Response) {
+  const user = requireUser(request);
+  const currentWorkspace = await resolveCurrentWorkspace(user, request);
+  const service = new IntegrationService(getFirebaseDb());
+  const result = await service.connectStripeWithApiKey(currentWorkspace, user.id, request.body.apiKey);
+
+  response.json(result);
+}
+
 export async function integrationCallback(request: Request, response: Response) {
   const service = new IntegrationService(getFirebaseDb());
   const redirectUrl = await service.handleOAuthCallback(getProvider(request), {
