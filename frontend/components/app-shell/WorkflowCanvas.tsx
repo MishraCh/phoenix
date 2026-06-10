@@ -301,11 +301,12 @@ function TriggerConfigPanel({
           <p className="mb-2 text-xs font-medium text-muted-foreground">Trigger type</p>
           <div className="grid grid-cols-3 gap-1">
             {(["manual", "scheduled", "integration_event"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => emit(t)}
+              <button key={t} type="button" onClick={() => emit(t)} disabled={t === "integration_event"}
                 className={`rounded-xl border px-2 py-1.5 text-[11px] font-medium transition
-                  ${type === t ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}
+                  ${type === t ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"}
+                  ${t === "integration_event" ? "cursor-not-allowed opacity-50" : ""}`}
               >
-                {t === "manual" ? "Manual" : t === "scheduled" ? "Scheduled" : "Event"}
+                {t === "manual" ? "Manual" : t === "scheduled" ? "Scheduled" : "Event (soon)"}
               </button>
             ))}
           </div>
@@ -819,8 +820,8 @@ function StepConfigPanel({
               <select className={inputCls} value={String(step.config.provider ?? "hubspot")}
                 onChange={(e) => onConfigChange("provider", e.target.value)}>
                 <option value="hubspot">HubSpot</option>
-                <option value="salesforce">Salesforce</option>
-                <option value="gmail">Gmail</option>
+                <option value="salesforce" disabled>Salesforce (coming soon)</option>
+                <option value="gmail" disabled>Gmail (coming soon)</option>
               </select>
             </div>
             <div>
@@ -843,8 +844,8 @@ function StepConfigPanel({
               <select className={inputCls} value={String(step.config.provider ?? "hubspot")}
                 onChange={(e) => onConfigChange("provider", e.target.value)}>
                 <option value="hubspot">HubSpot</option>
-                <option value="salesforce">Salesforce</option>
-                <option value="gmail">Gmail</option>
+                <option value="salesforce" disabled>Salesforce (coming soon)</option>
+                <option value="gmail" disabled>Gmail (coming soon)</option>
               </select>
             </div>
             <div>
@@ -854,7 +855,7 @@ function StepConfigPanel({
                 <option value="create">Create Record</option>
                 <option value="update">Update Record</option>
                 <option value="delete">Delete Record</option>
-                <option value="prepareSendApproval">Send outbound email through Gmail</option>
+                <option value="prepareSendApproval" disabled>Send outbound email — Gmail (coming soon)</option>
               </select>
             </div>
             <p className="rounded-xl bg-[hsl(var(--badge-warning-bg))] px-3 py-2 text-[11px] text-[hsl(var(--badge-warning-text))]">

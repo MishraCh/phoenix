@@ -2,9 +2,17 @@ import { describe, it, expect } from "vitest";
 
 import { sanitizeWorkflowSteps, postProcessWorkflowDraft } from "../workflows/workflowDraftService.js";
 
+type TestStep = {
+  id: string;
+  type: string;
+  name: string;
+  config: Record<string, unknown>;
+  order: number;
+};
+
 describe("sanitizeWorkflowSteps", () => {
   it("passes through supported steps unchanged", () => {
-    const { steps, issues } = sanitizeWorkflowSteps([
+    const { steps, issues } = sanitizeWorkflowSteps<TestStep>([
       { id: "s1", type: "agent", name: "Research", config: { agentId: "auto", task: "Research X" }, order: 0 },
       { id: "s2", type: "artifact", name: "Save", config: { artifactType: "report" }, order: 1 },
       { id: "s3", type: "notification", name: "Notify", config: { channel: "in_app" }, order: 2 },
@@ -14,7 +22,7 @@ describe("sanitizeWorkflowSteps", () => {
   });
 
   it("converts non-executable 'tool'/'action' steps to agent tasks", () => {
-    const { steps, issues } = sanitizeWorkflowSteps([
+    const { steps, issues } = sanitizeWorkflowSteps<TestStep>([
       { id: "s1", type: "tool", name: "Run web search", config: { toolName: "web.researchTask" }, order: 0 },
       { id: "s2", type: "action", name: "Do thing", config: {}, order: 1 },
     ]);
@@ -25,7 +33,7 @@ describe("sanitizeWorkflowSteps", () => {
   });
 
   it("replaces gmail outbound actions with a system_email notification (coming soon)", () => {
-    const { steps, issues } = sanitizeWorkflowSteps([
+    const { steps, issues } = sanitizeWorkflowSteps<TestStep>([
       {
         id: "s1",
         type: "integration.action",
@@ -41,7 +49,7 @@ describe("sanitizeWorkflowSteps", () => {
   });
 
   it("converts salesforce reads to agent research steps; keeps hubspot intact", () => {
-    const { steps, issues } = sanitizeWorkflowSteps([
+    const { steps, issues } = sanitizeWorkflowSteps<TestStep>([
       { id: "s1", type: "integration.read", name: "Read SF", config: { provider: "salesforce" }, order: 0 },
       { id: "s2", type: "integration.read", name: "Read HubSpot", config: { provider: "hubspot" }, order: 1 },
     ]);

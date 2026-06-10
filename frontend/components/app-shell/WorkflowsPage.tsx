@@ -306,9 +306,9 @@ function TriggerConfigurator({ trigger, onChange, readOnly, nextRunAt }: { trigg
         {!readOnly && (
           <div className="ml-auto flex gap-1 bg-muted/50 p-1 rounded-xl">
             {(["manual", "scheduled", "integration_event"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => emit(t)}
-                className={`rounded-lg px-3 py-1 text-xs font-medium transition ${parsed.type === t ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                {t === "manual" ? "Manual" : t === "scheduled" ? "Scheduled" : "Event"}
+              <button key={t} type="button" onClick={() => emit(t)} disabled={t === "integration_event"}
+                className={`rounded-lg px-3 py-1 text-xs font-medium transition ${parsed.type === t ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"} ${t === "integration_event" ? "cursor-not-allowed opacity-50" : ""}`}>
+                {t === "manual" ? "Manual" : t === "scheduled" ? "Scheduled" : "Event (soon)"}
               </button>
             ))}
           </div>
