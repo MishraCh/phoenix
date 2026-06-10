@@ -21,6 +21,7 @@ import { ExaWebsetsProvider } from "../web/providers/exaWebsetsProvider.js";
 import { JobLockService } from "../jobs/jobLockService.js";
 import { createLlmProvider } from "../ai/providers/providerRegistry.js";
 import { mapEnrichment } from "../integrations/providers/hubspot/crmFieldMap.js";
+import { env } from "../config/env.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
 export type ToolExecutionContext = {
@@ -620,22 +621,50 @@ function crmEnrichEntityTool(context: ToolExecutionContext) {
 function leadsBuildDatasetTool(context: ToolExecutionContext) {
   return tool(
     async (input) => {
-      const { websetId } = await new ExaWebsetsProvider().create({
-        query: input.query,
-        count: input.count,
-        entity: input.entity,
-        enrichments: input.enrichments,
-      });
       const label = input.query.length > 80 ? `${input.query.slice(0, 77)}…` : input.query;
-      await new JobLockService(context.db).enqueueJob({
+      const jobs = new JobLockService(context.db);
+      const baseInput = {
+        label,
+        entity: input.entity ?? "company",
+        query: input.query,
+        count: input.count ?? 10,
+        enrichments: input.enrichments ?? [],
+      };
+
+      // Prefer Exa Websets when enabled (Pro plan); fall back to search+enrich otherwise
+      // or on any Websets error, so the dataset always builds.
+      if (env.EXA_WEBSETS_ENABLED) {
+        try {
+          const { websetId } = await new ExaWebsetsProvider().create({
+            query: input.query,
+            count: input.count,
+            entity: input.entity,
+            enrichments: input.enrichments,
+          });
+          await jobs.enqueueJob({
+            workspaceId: context.currentWorkspace.id,
+            jobType: "exa_webset_poll",
+            userId: context.userId,
+            input: { ...baseInput, websetId },
+          });
+          return {
+            status: "started",
+            websetId,
+            message: `Building your enriched dataset "${label}" via Exa Websets — I'll save it to your Library and notify you.`,
+          };
+        } catch {
+          // Websets unavailable (plan/error) — fall through to the search+enrich path.
+        }
+      }
+
+      await jobs.enqueueJob({
         workspaceId: context.currentWorkspace.id,
         jobType: "exa_webset_poll",
         userId: context.userId,
-        input: { websetId, label, entity: input.entity ?? "company", query: input.query },
+        input: { ...baseInput, mode: "search_enrich" },
       });
       return {
         status: "started",
-        websetId,
         message: `Building your enriched dataset "${label}" — I'll save it to your Library and notify you when it's ready.`,
       };
     },
@@ -1990,7 +2019,7 @@ export const toolDefinitions: ToolDefinition[] = [
     inputSchema: leadsBuildDatasetInputSchema,
     outputSchema: z.object({
       status: z.string(),
-      websetId: z.string(),
+      websetId: z.string().optional(),
       message: z.string(),
     }),
     permissionsRequired: ["web.read"],

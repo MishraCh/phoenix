@@ -30,6 +30,18 @@ vi.mock("../notifications/notificationService.js", () => ({
   },
 }));
 
+const searchEntitiesMock = vi.fn();
+vi.mock("../web/providers/exaSearchProvider.js", () => ({
+  ExaSearchProvider: class {
+    searchEntities = searchEntitiesMock;
+  },
+}));
+
+const generateStructuredMock = vi.fn();
+vi.mock("../ai/providers/providerRegistry.js", () => ({
+  createLlmProvider: () => ({ generateStructured: generateStructuredMock }),
+}));
+
 import { processExaWebset } from "../jobs/exaTaskProcessor.js";
 
 const job = {
@@ -75,6 +87,45 @@ describe("processExaWebset", () => {
   it("sends a failure notification when the webset never becomes idle", async () => {
     pollMock.mockResolvedValue({ status: "running", idle: false });
     await processExaWebset({} as never, job, { pollIntervalMs: 1, maxPolls: 2 });
+    expect(createArtifactMock).not.toHaveBeenCalled();
+    expect(createNotificationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("search_enrich fallback: searches entities, enriches each, and saves a dataset artifact", async () => {
+    const fallbackJob = {
+      workspaceId: "w1",
+      payload: {
+        userId: "u1",
+        input: { mode: "search_enrich", label: "AI infra companies", entity: "company", query: "AI infra", count: 2, enrichments: [{ description: "Total funding" }] },
+      },
+    } as never;
+
+    searchEntitiesMock.mockResolvedValue([
+      { name: "Acme AI", url: "https://acme.ai", text: "Acme AI raised $12M." },
+      { name: "Beta AI", url: "https://beta.ai", text: "Beta AI raised $5M." },
+    ]);
+    generateStructuredMock.mockResolvedValue({ fields: [{ name: "Total funding", value: "$12M" }] });
+
+    const result = await processExaWebset({} as never, fallbackJob);
+
+    expect(searchEntitiesMock).toHaveBeenCalledWith("AI infra", 2);
+    expect(createArtifactMock).toHaveBeenCalledTimes(1);
+    const artifactArg = createArtifactMock.mock.calls[0][0] as { artifactType: string; content: string };
+    expect(artifactArg.artifactType).toBe("data");
+    const dataset = JSON.parse(artifactArg.content) as { rows: unknown[]; columns: Array<{ key: string }> };
+    expect(dataset.rows).toHaveLength(2);
+    expect(dataset.columns.some((c) => c.key === "Total funding")).toBe(true);
+    expect(createNotificationMock).toHaveBeenCalledTimes(1);
+    expect(result.resultRef).toContain("art_1");
+  });
+
+  it("search_enrich: notifies (no artifact) when no entities are found", async () => {
+    const fallbackJob = {
+      workspaceId: "w1",
+      payload: { userId: "u1", input: { mode: "search_enrich", label: "Nothing", entity: "company", query: "zzz", count: 2 } },
+    } as never;
+    searchEntitiesMock.mockResolvedValue([]);
+    await processExaWebset({} as never, fallbackJob);
     expect(createArtifactMock).not.toHaveBeenCalled();
     expect(createNotificationMock).toHaveBeenCalledTimes(1);
   });

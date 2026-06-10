@@ -102,6 +102,34 @@ export class ExaSearchProvider {
   }
 
   /**
+   * Raw entity search (for dataset building): returns up to `numResults` results
+   * with title/url/text. Used by the search+enrich dataset fallback.
+   */
+  async searchEntities(query: string, numResults = 10): Promise<Array<{ name: string; url: string; text: string }>> {
+    if (!env.EXA_API_KEY) {
+      throw new ApiError({
+        code: "WEB_PROVIDER_CONFIG_MISSING",
+        message: "EXA_API_KEY is required for Exa entity search.",
+        status: 500,
+      });
+    }
+    const exa = new Exa(env.EXA_API_KEY);
+    const response = (await exa.searchAndContents(query, {
+      numResults,
+      text: { maxCharacters: 1500 },
+    })) as unknown as { results?: Array<{ title?: string; url?: string; text?: string }> };
+
+    const results = Array.isArray(response.results) ? response.results : [];
+    return results
+      .filter((result): result is { title?: string; url: string; text?: string } => typeof result.url === "string")
+      .map((result) => ({
+        name: result.title ?? result.url,
+        url: result.url,
+        text: typeof result.text === "string" ? result.text : "",
+      }));
+  }
+
+  /**
    * Find sources similar to a given URL (related-source discovery / enrichment).
    * Returns web SourceRefs; excludes the source domain so results are genuinely related.
    */

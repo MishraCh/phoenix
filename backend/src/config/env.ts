@@ -82,6 +82,9 @@ const envSchema = z.object({
   LLM_PROVIDER: z.enum(["auto", "gateway", "openai"]).default("auto"),
   AI_GATEWAY_API_KEY: optionalString(),
   EXA_API_KEY: optionalString(),
+  // Exa Websets requires a Pro plan. When false (default), lead datasets build via the
+  // search+enrich fallback (works on any plan). Set true once Pro access exists.
+  EXA_WEBSETS_ENABLED: z.string().default("false"),
   GATEWAY_FAST_MODEL: z.string().default("openai/gpt-5.4-mini"),
   GATEWAY_DEFAULT_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
   GATEWAY_REASONING_MODEL: z.string().default("anthropic/claude-sonnet-4.5"),
@@ -178,6 +181,7 @@ export const env = {
   CONTEXT_V2: parsedEnv.data.CONTEXT_V2 === "true",
   EXECUTION_V2: parsedEnv.data.EXECUTION_V2 === "true",
   AGENTIC_TOOLLOOP_V1: parsedEnv.data.AGENTIC_TOOLLOOP_V1 === "true",
+  EXA_WEBSETS_ENABLED: parsedEnv.data.EXA_WEBSETS_ENABLED === "true",
   RETRIEVAL_V2_SHADOW: parsedEnv.data.RETRIEVAL_V2_SHADOW === "true",
   RETRIEVAL_V2_ACTIVE: parsedEnv.data.RETRIEVAL_V2_ACTIVE === "true",
   EXPERT_V2: parsedEnv.data.EXPERT_V2 === "true",
