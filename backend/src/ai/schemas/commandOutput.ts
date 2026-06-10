@@ -95,7 +95,7 @@ export const commandPlanSchema = z.object({
         "1. For AI tasks, research, search, or generation: use type='agent' and config={ task: 'Strict instruction for the agent (e.g., \"Research XYZ\"). DO NOT put conversational answers or \"I drafted...\" text here.', agentId: 'auto' }. " +
         "2. For fetching a specific URL: use type='fetch_url' and config={ url: 'https...', objective: 'what to extract' }. " +
         "3. For Gideon system email notifications to the workflow owner: use type='notification' and config={ channel: 'system_email', recipient: 'workflow_owner', includeInAppCopy: true }. For ordinary in-app alerts use channel='in_app'. " +
-        "4. For outbound Gmail messages to external recipients: use type='integration.action' and config={ provider: 'gmail', operation: 'prepareSendApproval', recipients: [], subjectSourceStepId: '...', bodySourceStepId: '...' }. Gmail sends require approval on every run. " +
+        "4. Outbound Gmail and Salesforce steps are COMING SOON — NEVER use provider 'gmail', 'google', or 'salesforce' in integration steps. If the user asks to email someone externally, add a system_email notification to the workflow owner instead and note the limitation. HubSpot integration steps (provider 'hubspot') are fully supported. " +
         "5. For saving a report/summary: use type='artifact' and config={ artifactType: 'report', title: '...' }. " +
         "6. For monitoring a topic/URL: use type='monitor' and config={ targetType: 'keyword', target: '...', objective: '...' }. " +
         "7. For scheduled workflows, NEVER use {{variables}} in configs as they cannot be provided during automated runs. " +

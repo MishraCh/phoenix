@@ -2059,7 +2059,7 @@ export class CommandGraphService {
           } else if (state.resolvedMode === "research") {
             modeInstructions = "Produce a deeper sourced research answer with clear sections. Prefer artifact-worthy structure and preserve uncertainty.";
           } else if (state.resolvedMode === "workflow") {
-            modeInstructions = "Design a complete, logical workflow draft to achieve the user's goal. Use the `workflowDraft` object. Choose the correct triggerType and cron schedule based on their request. Use 'fetch_url', 'agent', 'monitor', 'artifact', 'integration.action', or 'notification' step types. Keep steps focused and essential.";
+            modeInstructions = "Design a complete, logical workflow draft to achieve the user's goal. Use the `workflowDraft` object. Choose the correct triggerType and cron schedule based on their request. Use 'fetch_url', 'agent', 'monitor', 'artifact', 'integration.read' (hubspot only), or 'notification' step types. Gmail and Salesforce steps are coming soon — never use them; to deliver results by email use a notification step with channel 'system_email'. Keep steps focused and essential.";
           } else if (state.resolvedMode === "extract_url") {
             modeInstructions = "Summarize the extracted page clearly. Provide a concise summary plus key evidence directly from the page. Use the extracted page content as the source of truth.";
           } else {

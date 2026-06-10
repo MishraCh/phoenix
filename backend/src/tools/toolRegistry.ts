@@ -24,6 +24,7 @@ import { mapEnrichment } from "../integrations/providers/hubspot/crmFieldMap.js"
 import { StripeIntegrationService } from "../integrations/providers/stripe/stripeIntegrationService.js";
 import { env } from "../config/env.js";
 import { WorkflowService } from "../workflows/workflowService.js";
+import { sanitizeWorkflowSteps } from "../workflows/workflowDraftService.js";
 
 export type ToolExecutionContext = {
   db: Firestore;
@@ -194,9 +195,7 @@ const workflowGenerateInputSchema = z.object({
     type: z.enum([
       "context",
       "agent",
-      "tool",
       "approval",
-      "action",
       "notification",
       "artifact",
       "monitor",
@@ -209,13 +208,14 @@ const workflowGenerateInputSchema = z.object({
     config: z.record(z.string(), z.unknown())
       })).describe(
         "The steps of the workflow. Design a logical, complete pipeline that fully achieves the user's goal. Ensure all necessary steps (e.g., retrieving data, processing it, and notifying the user) are included without adding unnecessary bloat. " +
-        "CRITICAL MAPPING RULES for Supported Step Types (DO NOT use 'tool' or 'action' types): " +
+        "CRITICAL MAPPING RULES for Supported Step Types: " +
         "1. For AI tasks, research, search, or generation: use type='agent' and config={ task: 'detailed instructions', agentId: 'auto' }. " +
         "2. For fetching a specific URL: use type='fetch_url' and config={ url: 'https...', objective: 'what to extract' }. " +
-        "3. For email notifications: use type='notification' and config={ channel: 'email' }. " +
+        "3. To email the workflow owner: use type='notification' and config={ channel: 'system_email', recipient: 'workflow_owner', includeInAppCopy: true }; for in-app alerts use channel='in_app'. " +
         "4. For saving a report/summary: use type='artifact' and config={ artifactType: 'report', title: '...' }. " +
         "5. For monitoring a topic/URL: use type='monitor' and config={ targetType: 'keyword', target: '...', objective: '...' }. " +
-        "6. For scheduled workflows, NEVER use {{variables}} in configs as they cannot be provided during automated runs. " +
+        "6. For CRM context: use type='integration.read' with config={ provider: 'hubspot', ... }. Gmail and Salesforce steps are COMING SOON — never use them. " +
+        "7. For scheduled workflows, NEVER use {{variables}} in configs as they cannot be provided during automated runs. " +
         "NEVER invent unsupported step types or configurations."
       ),
 });
@@ -943,14 +943,18 @@ function workflowGenerateTool(context: ToolExecutionContext) {
   return tool(
     async (input) => {
       const service = new WorkflowService(context.db);
-      
-      const steps = input.steps.map((step, index) => ({
-        id: `step-${index + 1}-${Date.now()}`,
-        type: step.type,
-        name: step.name,
-        config: step.config,
-        order: index + 1,
-      }));
+
+      // Coerce to the executable step subset (gmail/salesforce coming soon, etc.).
+      const { steps: sanitizedSteps, issues } = sanitizeWorkflowSteps(
+        input.steps.map((step, index) => ({
+          id: `step-${index + 1}-${Date.now()}`,
+          type: step.type,
+          name: step.name,
+          config: step.config,
+          order: index + 1,
+        })),
+      );
+      const steps = sanitizedSteps;
 
       const workflow = await service.createWorkflow({
         workspace: context.currentWorkspace.workspace,
@@ -973,7 +977,8 @@ function workflowGenerateTool(context: ToolExecutionContext) {
         name: workflow.name,
         triggerType: input.triggerType,
         stepCount: workflow.steps.length,
-        message: `Workflow created: ${workflow.name}`,
+        message: `Workflow created: ${workflow.name}${issues.length ? ` (adjustments: ${issues.join(" ")})` : ""}`,
+        adjustments: issues,
         workflow,
       };
     },
@@ -2376,6 +2381,7 @@ export const toolDefinitions: ToolDefinition[] = [
       triggerType: z.string(),
       stepCount: z.number().int().nonnegative(),
       message: z.string(),
+      adjustments: z.array(z.string()),
       workflow: z.record(z.string(), z.unknown()),
     }),
     permissionsRequired: ["workflows.write"],

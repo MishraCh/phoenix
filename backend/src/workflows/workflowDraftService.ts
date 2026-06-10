@@ -370,6 +370,88 @@ export function buildWorkflowDraftPlan(input: BuildWorkflowDraftInput): CommandP
   };
 }
 
+type SanitizableStep = {
+  id?: string;
+  type: string;
+  name: string;
+  config: Record<string, unknown>;
+  order?: number;
+  inputStepIds?: string[];
+};
+
+/** Providers that cannot back workflow steps right now (gmail is coming soon; salesforce never shipped). */
+const UNAVAILABLE_STEP_PROVIDERS = new Set(["gmail", "google", "salesforce"]);
+/** Step types declared in schemas but never dispatched by the run processor. */
+const NON_EXECUTABLE_STEP_TYPES = new Set(["tool", "action"]);
+
+/**
+ * Coerce LLM-generated workflow steps to the executable subset so every saved
+ * workflow actually runs:
+ *  - 'tool'/'action' (never dispatched) → 'agent' steps with an equivalent task.
+ *  - integration steps on unavailable providers (gmail coming soon, salesforce) →
+ *    notification (for outbound sends) or agent research steps, with a note.
+ * Returns the sanitized steps plus human-readable issues for the draft card.
+ */
+export function sanitizeWorkflowSteps<T extends SanitizableStep>(
+  steps: T[],
+): { steps: T[]; issues: string[] } {
+  const issues: string[] = [];
+
+  const sanitized = steps.map((step, index) => {
+    const config = { ...(step.config ?? {}) };
+
+    if (NON_EXECUTABLE_STEP_TYPES.has(step.type)) {
+      issues.push(`Step "${step.name}" used the unsupported type "${step.type}" and was converted to an agent task.`);
+      const task =
+        typeof config["task"] === "string" && config["task"].trim()
+          ? config["task"]
+          : `Complete this step: ${step.name}${typeof config["toolName"] === "string" ? ` (intended tool: ${config["toolName"]})` : ""}.`;
+      return { ...step, type: "agent", config: { agentId: "auto", task } } as T;
+    }
+
+    if (
+      (step.type === "integration.action" || step.type === "integration.read") &&
+      typeof config["provider"] === "string" &&
+      UNAVAILABLE_STEP_PROVIDERS.has(config["provider"].toLowerCase())
+    ) {
+      const provider = config["provider"] as string;
+      if (step.type === "integration.action") {
+        issues.push(
+          `Outbound ${provider} actions are coming soon — step "${step.name}" was replaced with a Gideon email notification to you.`,
+        );
+        return {
+          ...step,
+          type: "notification",
+          name: "Email me the result",
+          config: {
+            channel: "system_email",
+            recipient: "workflow_owner",
+            includeInAppCopy: true,
+            ...(typeof config["bodySourceStepId"] === "string"
+              ? { contentSourceStepId: config["bodySourceStepId"] }
+              : {}),
+          },
+        } as T;
+      }
+      issues.push(
+        `${provider} data is not available yet — step "${step.name}" was converted to an agent research task.`,
+      );
+      return {
+        ...step,
+        type: "agent",
+        config: {
+          agentId: "auto",
+          task: `Gather the context this step needs (${step.name}) from workspace memory and the web instead of ${provider}.`,
+        },
+      } as T;
+    }
+
+    return { ...step, config, order: typeof step.order === "number" ? step.order : index } as T;
+  });
+
+  return { steps: sanitized, issues };
+}
+
 export function postProcessWorkflowDraft(
   draft: NonNullable<CommandPlan["workflowDraft"]>,
   query: string,
@@ -395,18 +477,29 @@ export function postProcessWorkflowDraft(
     effectiveDeliveryIntent = resolveDeliveryIntent(query);
   }
 
+  // Gmail outbound is coming soon — downgrade to Gideon system email so the
+  // workflow still delivers on every run.
+  if (effectiveDeliveryIntent === "gmail_outbound") {
+    effectiveDeliveryIntent = "system_email";
+    validationIssues.push(
+      "Outbound Gmail sending is coming soon — this workflow emails you via Gideon instead.",
+    );
+  }
+
   if (effectiveDeliveryIntent === "system_email" && !hasSmtpConfiguration()) {
     validationIssues.push("Gideon system email is not fully configured; this workflow will still create in-app notifications.");
   }
 
   const draftId = draft.draftId || stableDraftId(`${query}:${normTimezone}:${JSON.stringify(draft.steps || [])}`) || randomUUID();
 
-  // Ensure every step has an ID and a normalized type
-  const steps = (draft.steps || []).map((step, index) => ({
+  // Ensure every step has an ID, then coerce to the executable step subset.
+  const numberedSteps = (draft.steps || []).map((step, index) => ({
     ...step,
     id: step.id || `step-${index + 1}`,
     order: typeof step.order === "number" ? step.order : index,
   }));
+  const { steps, issues: stepIssues } = sanitizeWorkflowSteps(numberedSteps);
+  validationIssues.push(...stepIssues);
 
   return {
     ...draft,
