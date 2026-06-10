@@ -11,7 +11,7 @@ export class SmtpService {
     secure: true, // true for 465, false for other ports
     auth: {
       user: process.env.SMTP_USER || "apikey",
-      pass: process.env.SMTP_PASS || "REDACTED",
+      pass: process.env.SMTP_PASS || "",
     },
   });
 
