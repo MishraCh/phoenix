@@ -609,7 +609,7 @@ export function LandingPage() {
             <HeaderNavLink href="#use-cases">Use Cases</HeaderNavLink>
             <HeaderNavLink href="#integrations">Integrations</HeaderNavLink>
             <HeaderNavLink href="#enterprise">Enterprise</HeaderNavLink>
-            <HeaderNavLink href="#faq">Pricing</HeaderNavLink>
+            <HeaderNavLink href="#pricing">Pricing</HeaderNavLink>
           </nav>
 
           <div className={cn("flex items-center gap-2 text-sm", inter.className)}>
@@ -1066,6 +1066,89 @@ export function LandingPage() {
               </Link>
             </div>
           </div>
+        </section>
+
+        <section id="pricing" className="mx-auto w-full max-w-[1180px] px-5 py-24 lg:px-10">
+          <div className="text-center">
+            <h2 className={cn("text-[clamp(2.9rem,6vw,3.6rem)] font-medium leading-[1.04] tracking-[-0.045em] text-[#222222]", outfit.className)}>
+              Simple, workspace pricing
+            </h2>
+            <p className={cn("mt-4 text-[17px] leading-[1.72] text-[#5F5F68] lg:text-[18px]", inter.className)}>
+              Every plan includes the full Gideon experience — agents, workflows, and approvals. Scale credits and seats as you grow.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            {[
+              {
+                name: "Free",
+                price: "$0",
+                cadence: "forever",
+                highlight: false,
+                blurb: "For trying Gideon on real work.",
+                features: ["1 seat", "50 AI credits / month", "1 integration", "Core agents & workflows", "Approval-gated actions"],
+              },
+              {
+                name: "Plus",
+                price: "$29",
+                cadence: "per workspace / month",
+                highlight: true,
+                blurb: "For founders running daily operations.",
+                features: ["3 seats", "1,500 AI credits / month", "3 integrations", "All agent personas", "Custom workflows & schedules", "Lead datasets & enrichment"],
+              },
+              {
+                name: "Pro",
+                price: "$99",
+                cadence: "per workspace / month",
+                highlight: false,
+                blurb: "For teams operating at full speed.",
+                features: ["10 seats", "7,500 AI credits / month", "8 integrations", "Everything in Plus", "Priority workflow runs", "Advanced research depth"],
+              },
+            ].map((plan) => (
+              <div
+                key={plan.name}
+                className={cn(
+                  "relative rounded-[1.75rem] border bg-white p-8 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md",
+                  plan.highlight ? "border-[#0A0A0A] shadow-md" : "border-[rgba(229,229,229,0.9)]",
+                )}
+              >
+                {plan.highlight ? (
+                  <span className="absolute -top-3 left-8 rounded-full bg-[#0A0A0A] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                    Most popular
+                  </span>
+                ) : null}
+                <p className={cn("text-[15px] font-semibold text-[#0A0A0A]", inter.className)}>{plan.name}</p>
+                <p className={cn("mt-3 text-[2.6rem] font-medium tracking-[-0.04em] text-[#222222]", outfit.className)}>
+                  {plan.price}
+                  <span className={cn("ml-2 align-middle text-[13px] font-normal tracking-normal text-[#737373]", inter.className)}>{plan.cadence}</span>
+                </p>
+                <p className={cn("mt-2 text-[14px] leading-6 text-[#5F5F68]", inter.className)}>{plan.blurb}</p>
+                <ul className="mt-6 space-y-2.5">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className={cn("flex items-start gap-2 text-[14px] leading-6 text-[#3F3F46]", inter.className)}>
+                      <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-[#0A0A0A]" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/auth"
+                  className={cn(
+                    "mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium transition duration-300 hover:-translate-y-0.5",
+                    plan.highlight
+                      ? "bg-[#0A0A0A] text-white hover:bg-[#262626]"
+                      : "border border-[#D4D4D4] bg-white/50 text-[#0A0A0A] hover:border-[#A3A3A3]",
+                  )}
+                >
+                  Get started
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            ))}
+          </div>
+          <p className={cn("mt-6 text-center text-[13px] text-[#737373]", inter.className)}>
+            Billing is powered by Stripe — upgrade, manage, or cancel anytime from workspace settings.
+          </p>
         </section>
 
         <section id="faq" className="mx-auto w-full max-w-[1028px] px-5 py-24 lg:px-10">

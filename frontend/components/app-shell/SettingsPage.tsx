@@ -608,18 +608,30 @@ export function SettingsPage() {
                   Secure checkout via Stripe. Promo codes can be entered at checkout; manage or cancel anytime.
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button
-                    variant={snapshot.workspace.plan === "plus" ? "outline" : "default"}
-                    onClick={() => void handleStripeCheckout("plus")}
-                  >
-                    Upgrade to Plus
-                  </Button>
-                  <Button
-                    variant={snapshot.workspace.plan === "pro" ? "outline" : "default"}
-                    onClick={() => void handleStripeCheckout("pro")}
-                  >
-                    Upgrade to Pro
-                  </Button>
+                  <div className="rounded-xl border border-border/60 p-3">
+                    <p className="text-sm font-semibold">Plus — $29/mo</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">3 seats · 1,500 credits · 3 integrations</p>
+                    <Button
+                      className="mt-2 w-full"
+                      size="sm"
+                      variant={snapshot.workspace.plan === "plus" ? "outline" : "default"}
+                      onClick={() => void handleStripeCheckout("plus")}
+                    >
+                      {snapshot.workspace.plan === "plus" ? "Current plan" : "Upgrade to Plus"}
+                    </Button>
+                  </div>
+                  <div className="rounded-xl border border-border/60 p-3">
+                    <p className="text-sm font-semibold">Pro — $99/mo</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">10 seats · 7,500 credits · 8 integrations</p>
+                    <Button
+                      className="mt-2 w-full"
+                      size="sm"
+                      variant={snapshot.workspace.plan === "pro" ? "outline" : "default"}
+                      onClick={() => void handleStripeCheckout("pro")}
+                    >
+                      {snapshot.workspace.plan === "pro" ? "Current plan" : "Upgrade to Pro"}
+                    </Button>
+                  </div>
                 </div>
                 <Button variant="ghost" className="mt-2 w-full text-xs" onClick={() => void handleStripePortal()}>
                   Manage billing (Stripe customer portal)
