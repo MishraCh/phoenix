@@ -207,6 +207,16 @@ export class IntegrationService {
 
   async createConnectUrl(currentWorkspace: CurrentWorkspace, userId: string, providerId: string) {
     const provider = createIntegrationProvider(this.db, providerId);
+
+    // Gmail is temporarily gated: existing connections keep working, new connects are blocked.
+    if (provider.id === "gmail") {
+      throw new ApiError({
+        code: "FEATURE_COMING_SOON",
+        message: "Gmail is coming soon. Connect HubSpot or Stripe in the meantime.",
+        status: 503,
+      });
+    }
+
     const existingIntegration = await this.getIntegration(currentWorkspace, provider.id);
 
     await new UsageService(this.db).assertIntegrationLimit(
