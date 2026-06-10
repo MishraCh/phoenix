@@ -35,6 +35,14 @@ const capabilitySetupHints: Record<
     requiredIntegration: "gmail",
     setupHint: "Connect Gmail to unlock email read access.",
   },
+  "payments.read": {
+    requiredIntegration: "stripe",
+    setupHint: "Connect Stripe to unlock revenue, customer, and payment insights.",
+  },
+  "payments.write": {
+    requiredIntegration: "stripe",
+    setupHint: "Connect Stripe to unlock approval-gated payment links.",
+  },
   "email.draft": {
     requiredIntegration: "gmail",
     setupHint: "Connect Gmail to unlock email draft access.",

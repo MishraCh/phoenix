@@ -21,6 +21,7 @@ import { ExaWebsetsProvider } from "../web/providers/exaWebsetsProvider.js";
 import { JobLockService } from "../jobs/jobLockService.js";
 import { createLlmProvider } from "../ai/providers/providerRegistry.js";
 import { mapEnrichment } from "../integrations/providers/hubspot/crmFieldMap.js";
+import { StripeIntegrationService } from "../integrations/providers/stripe/stripeIntegrationService.js";
 import { env } from "../config/env.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
@@ -134,6 +135,17 @@ const crmEnrichEntityInputSchema = z
   .refine((value) => Boolean(value.name || value.domain), {
     message: "Provide a name or domain to enrich.",
   });
+
+const stripeListInputSchema = z.object({
+  limit: z.number().int().min(1).max(25).optional(),
+});
+
+const stripePaymentLinkInputSchema = z.object({
+  productName: z.string().trim().min(1).max(120),
+  amountUsd: z.number().positive().max(100_000),
+  quantity: z.number().int().min(1).max(100).optional(),
+  title: z.string().trim().min(1).optional(),
+});
 
 const leadsBuildDatasetInputSchema = z.object({
   query: z.string().trim().min(1),
@@ -560,6 +572,142 @@ function webExtractUrlTool(context: ToolExecutionContext) {
       name: "web.extractUrl",
       description: "Extract LLM-ready content from one or more known public URLs.",
       schema: webExtractUrlInputSchema,
+    },
+  );
+}
+
+function stripeRevenueSummaryTool(context: ToolExecutionContext) {
+  return tool(
+    async () => {
+      const summary = await new StripeIntegrationService(context.db).getRevenueSummary(
+        context.currentWorkspace.id,
+      );
+      return { status: "completed", ...summary };
+    },
+    {
+      name: "stripe.revenueSummary",
+      description:
+        "Get this workspace's Stripe revenue snapshot: 30-day gross volume (in cents), payment count, and active subscriptions.",
+      schema: z.object({}),
+    },
+  );
+}
+
+function stripeListCustomersTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const customers = await new StripeIntegrationService(context.db).listCustomers(
+        context.currentWorkspace.id,
+        input.limit ?? 10,
+      );
+      return { status: "completed", customers };
+    },
+    {
+      name: "stripe.listCustomers",
+      description: "List recent Stripe customers (name, email, created).",
+      schema: stripeListInputSchema,
+    },
+  );
+}
+
+function stripeListPaymentsTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const payments = await new StripeIntegrationService(context.db).listPayments(
+        context.currentWorkspace.id,
+        input.limit ?? 10,
+      );
+      return { status: "completed", payments };
+    },
+    {
+      name: "stripe.listPayments",
+      description: "List recent Stripe payments (amount in cents, currency, status, customer email).",
+      schema: stripeListInputSchema,
+    },
+  );
+}
+
+function stripeListSubscriptionsTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const subscriptions = await new StripeIntegrationService(context.db).listSubscriptions(
+        context.currentWorkspace.id,
+        input.limit ?? 10,
+      );
+      return { status: "completed", subscriptions };
+    },
+    {
+      name: "stripe.listSubscriptions",
+      description: "List Stripe subscriptions (status, amount in cents, billing interval).",
+      schema: stripeListInputSchema,
+    },
+  );
+}
+
+function stripePreparePaymentLinkApprovalTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const approvalService = new ApprovalService(context.db);
+      const idempotencyKey = `stripe_payment_link:${createHash("sha256")
+        .update(JSON.stringify({ productName: input.productName, amountUsd: input.amountUsd, quantity: input.quantity ?? 1 }))
+        .digest("hex")
+        .slice(0, 16)}`;
+      const approval = await approvalService.createApproval({
+        workspace: context.currentWorkspace.workspace,
+        userId: context.userId,
+        title: input.title ?? `Create payment link: ${input.productName} ($${input.amountUsd})`,
+        reason: "Creating a shareable Stripe payment link requires approval.",
+        type: "other",
+        preview: {
+          productName: input.productName,
+          amountUsd: input.amountUsd,
+          quantity: input.quantity ?? 1,
+        },
+        proposedAction: {
+          toolName: "stripe.createPaymentLinkApproved",
+          actionType: "stripe_payment_link",
+          input: {
+            productName: input.productName,
+            amountUsd: input.amountUsd,
+            ...(input.quantity ? { quantity: input.quantity } : {}),
+          },
+          requiresApproval: true,
+          riskLevel: "medium",
+        },
+        riskLevel: "medium",
+        sourceRefs: [],
+        idempotencyKey,
+      });
+      return {
+        approvalId: approval.id,
+        label: `Payment link: ${input.productName} ($${input.amountUsd})`,
+        actionType: "stripe_payment_link",
+        riskLevel: "medium",
+        requiresApproval: true,
+      };
+    },
+    {
+      name: "stripe.preparePaymentLinkApproval",
+      description:
+        "Create an approval draft for a shareable Stripe payment link. Required: productName, amountUsd (e.g. 99 for $99). The link is only created after a human approves.",
+      schema: stripePaymentLinkInputSchema,
+    },
+  );
+}
+
+function stripeCreatePaymentLinkApprovedTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const result = await new StripeIntegrationService(context.db).createPaymentLink(
+        context.currentWorkspace.id,
+        { productName: input.productName, amountUsd: input.amountUsd, quantity: input.quantity },
+      );
+      return { status: "completed", url: result.url, paymentLinkId: result.paymentLinkId };
+    },
+    {
+      name: "stripe.createPaymentLinkApproved",
+      description: "Execute a previously approved Stripe payment-link creation.",
+      schema: stripePaymentLinkInputSchema,
     },
   );
 }
@@ -2012,6 +2160,104 @@ export const toolDefinitions: ToolDefinition[] = [
     requiresApproval: false,
     idempotencyRequired: false,
     buildTool: crmEnrichEntityTool,
+  },
+  {
+    name: "stripe.revenueSummary",
+    description: "Stripe revenue snapshot: 30-day gross volume, payment count, active subscriptions.",
+    inputSchema: z.object({}),
+    outputSchema: z.object({
+      status: z.string(),
+      grossVolume30d: z.number(),
+      currency: z.string(),
+      paymentsCount30d: z.number(),
+      activeSubscriptions: z.number(),
+    }),
+    permissionsRequired: ["integrations.read"],
+    capabilitiesRequired: ["payments.read"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: stripeRevenueSummaryTool,
+  },
+  {
+    name: "stripe.listCustomers",
+    description: "List recent Stripe customers.",
+    inputSchema: stripeListInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      customers: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["integrations.read"],
+    capabilitiesRequired: ["payments.read"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: stripeListCustomersTool,
+  },
+  {
+    name: "stripe.listPayments",
+    description: "List recent Stripe payments.",
+    inputSchema: stripeListInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      payments: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["integrations.read"],
+    capabilitiesRequired: ["payments.read"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: stripeListPaymentsTool,
+  },
+  {
+    name: "stripe.listSubscriptions",
+    description: "List Stripe subscriptions.",
+    inputSchema: stripeListInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      subscriptions: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["integrations.read"],
+    capabilitiesRequired: ["payments.read"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: stripeListSubscriptionsTool,
+  },
+  {
+    name: "stripe.preparePaymentLinkApproval",
+    description: "Create ONE approval for a shareable Stripe payment link (productName + amountUsd).",
+    inputSchema: stripePaymentLinkInputSchema,
+    outputSchema: z.object({
+      approvalId: z.string(),
+      label: z.string(),
+      actionType: z.string(),
+      riskLevel: z.string(),
+      requiresApproval: z.boolean(),
+    }),
+    permissionsRequired: ["approvals.write"],
+    capabilitiesRequired: ["payments.write"],
+    riskLevel: "medium",
+    requiresApproval: false,
+    idempotencyRequired: true,
+    buildTool: stripePreparePaymentLinkApprovalTool,
+  },
+  {
+    name: "stripe.createPaymentLinkApproved",
+    description: "Execute a previously approved Stripe payment-link creation.",
+    inputSchema: stripePaymentLinkInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      url: z.string(),
+      paymentLinkId: z.string(),
+    }),
+    permissionsRequired: ["integrations.write"],
+    capabilitiesRequired: ["payments.write"],
+    riskLevel: "medium",
+    requiresApproval: true,
+    idempotencyRequired: true,
+    exposedToPlanner: false,
+    buildTool: stripeCreatePaymentLinkApprovedTool,
   },
   {
     name: "leads.buildDataset",

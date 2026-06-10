@@ -53,6 +53,7 @@ const APPROVAL_ACTION_TYPE_BY_TOOL: Record<string, string> = {
   hubspot_prepareTaskUpdateApproval: "hubspot_task_update",
   hubspot_prepareAssociationApproval: "hubspot_association_update",
   gmail_prepareSendApproval: "email_send",
+  stripe_preparePaymentLinkApproval: "stripe_payment_link",
 };
 
 type CollectorState = {
