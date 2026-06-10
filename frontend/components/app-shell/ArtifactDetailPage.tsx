@@ -10,6 +10,7 @@ import { fallbackArtifacts, type ArtifactDetail } from "@/services/artifacts";
 
 import { ProductHeader } from "./ProductHeader";
 import { PageSection, SummaryRow } from "./ProductPrimitives";
+import { DatasetTable, parseDataset } from "./renderers/DatasetTable";
 
 type ArtifactDetailPageProps = {
   artifactId: string;
@@ -91,9 +92,17 @@ export function ArtifactDetailPage({ artifactId }: ArtifactDetailPageProps) {
           title="Saved content"
           description="The preserved output body exactly as Gideon stored it in the workspace library."
         >
-          <div className="rounded-[1.35rem] border border-border/70 bg-background/70 px-5 py-4">
-            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{artifact.content}</p>
-          </div>
+          {(() => {
+            const dataset = parseDataset(artifact.content);
+            if (dataset) {
+              return <DatasetTable dataset={dataset} />;
+            }
+            return (
+              <div className="rounded-[1.35rem] border border-border/70 bg-background/70 px-5 py-4">
+                <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{artifact.content}</p>
+              </div>
+            );
+          })()}
         </PageSection>
 
         <PageSection

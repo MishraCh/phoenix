@@ -137,7 +137,7 @@ describe("ToolLoopAgentService", () => {
         {
           toolResults: [
             {
-              toolName: "gmail.prepareSendApproval",
+              toolName: "gmail_prepareSendApproval",
               output: { approvalId: "ap_1", label: "Email to Jane", riskLevel: "medium", requiresApproval: true },
             },
           ],
@@ -146,8 +146,25 @@ describe("ToolLoopAgentService", () => {
     });
     const result = (await new ToolLoopAgentService({} as any).run(baseInput)) as any;
     expect(result.createdApproval?.approvalId).toBe("ap_1");
+    expect(result.createdApproval?.actionType).toBe("email_send");
     expect(result.proposedActions).toHaveLength(1);
     expect(result.proposedActions[0].id).toBe("ap_1");
+  });
+
+  it("maps a bulk-write approval to the hubspot_bulk_write actionType (frontend routing)", async () => {
+    generateMock.mockResolvedValue({
+      text: "Prepared 10 records for your approval.",
+      steps: [
+        {
+          toolResults: [
+            { toolName: "hubspot_prepareBulkWriteApproval", output: { approvalId: "ap_bulk", rowCount: 10 } },
+          ],
+        },
+      ],
+    });
+    const result = (await new ToolLoopAgentService({} as any).run(baseInput)) as any;
+    expect(result.createdApproval?.approvalId).toBe("ap_bulk");
+    expect(result.createdApproval?.actionType).toBe("hubspot_bulk_write");
   });
 
   it("runStream emits token deltas and returns the same response shape (with sources)", async () => {

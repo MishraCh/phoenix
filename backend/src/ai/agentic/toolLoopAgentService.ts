@@ -38,8 +38,22 @@ type ToolResultOutput = {
   label?: string;
   riskLevel?: string;
   requiresApproval?: boolean;
+  actionType?: string;
 };
 type LoopStep = { toolResults?: Array<{ toolName?: string; output?: unknown }> };
+
+/** Map the (sanitized) prepare-approval tool name → the approval's real actionType,
+ *  so the frontend routes the agent-path approval to the right card. */
+const APPROVAL_ACTION_TYPE_BY_TOOL: Record<string, string> = {
+  hubspot_prepareUpdateApproval: "hubspot_update",
+  hubspot_prepareCreateApproval: "hubspot_create",
+  hubspot_prepareBulkWriteApproval: "hubspot_bulk_write",
+  hubspot_prepareNoteApproval: "hubspot_note_create",
+  hubspot_prepareTaskCreateApproval: "hubspot_task_create",
+  hubspot_prepareTaskUpdateApproval: "hubspot_task_update",
+  hubspot_prepareAssociationApproval: "hubspot_association_update",
+  gmail_prepareSendApproval: "email_send",
+};
 
 type CollectorState = {
   sourceRefs: SourceRef[];
@@ -65,12 +79,15 @@ function createCollector() {
         if (!out) continue;
         if (out.sourceRefs?.length) state.sourceRefs.push(...out.sourceRefs);
         if (out.approvalId) {
-          state.createdApproval = out;
+          const actionType =
+            typeof out.actionType === "string" ? out.actionType : APPROVAL_ACTION_TYPE_BY_TOOL[tr.toolName ?? ""];
+          state.createdApproval = { ...out, ...(actionType ? { actionType } : {}) };
           state.proposedActions.push({
             id: out.approvalId,
             label: out.label ?? "Proposed action",
             riskLevel: out.riskLevel ?? "medium",
             requiresApproval: out.requiresApproval ?? true,
+            ...(actionType ? { actionType } : {}),
           });
         }
         if (out.artifactId) state.createdArtifact = out;
