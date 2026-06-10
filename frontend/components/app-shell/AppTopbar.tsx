@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 
+import { PlanBadge } from "./PlanBadge";
 import { RunningStatusDropdown } from "./RunningStatusDropdown";
 import { navItems } from "./navItems";
 
@@ -79,6 +80,9 @@ export function AppTopbar({
 
         {/* ── Right: action controls ─────────────────────────────────── */}
         <div className="flex shrink-0 items-center gap-2">
+
+          {/* Plan */}
+          <PlanBadge />
 
           {/* New */}
           <DropdownMenu>

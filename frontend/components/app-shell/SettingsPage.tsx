@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BellRing, Lock, Palette, Pencil, Receipt, Shield, Wallet,
@@ -96,6 +96,24 @@ export function SettingsPage() {
   const { me, selectedWorkspace, refresh: refreshWorkspaces } = useWorkspace();
   const [activeTab, setActiveTab] = useState<SettingsTab>("Workspace");
   const [couponCode, setCouponCode] = useState("");
+
+  // Deep link support: /settings?tab=billing (used by the topbar plan badge).
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get("tab")?.toLowerCase();
+    if (!slug) return;
+    const slugToTab: Record<string, SettingsTab> = {
+      billing: "Billing & Plan",
+      profile: "Profile",
+      workspace: "Workspace",
+      members: "Members & Roles",
+      notifications: "Notifications",
+      agents: "Agents",
+      workflows: "Workflows",
+      security: "Security",
+    };
+    const tab = slugToTab[slug];
+    if (tab) setActiveTab(tab);
+  }, []);
   const [activeChannelView, setActiveChannelView] = useState<"list" | "history">("list");
   const [editName, setEditName] = useState(false);
   const [nameDraft, setNameDraft] = useState(user?.displayName ?? "");
