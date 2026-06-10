@@ -25,7 +25,7 @@ type CreateApprovalInput = {
   userId: string;
   title: string;
   reason: string;
-  type: "email_send" | "crm_update" | "crm_create" | "slack_message" | "task_create" | "other";
+  type: "email_send" | "crm_update" | "crm_create" | "crm_bulk" | "slack_message" | "task_create" | "other";
   preview: Record<string, unknown>;
   proposedAction: unknown;
   riskLevel: "low" | "medium" | "high" | "critical";

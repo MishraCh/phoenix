@@ -1715,6 +1715,140 @@ export class IntegrationWorkspaceService {
     };
   }
 
+  async prepareHubSpotBulkWriteApproval(
+    currentWorkspace: CurrentWorkspace,
+    userId: string,
+    input: {
+      module: HubSpotModule;
+      records: Array<{ recordId?: string; properties: Record<string, unknown> }>;
+      title?: string;
+    },
+  ) {
+    if (!input.records?.length) {
+      throw new ApiError({ code: "VALIDATION_ERROR", message: "Bulk write needs at least one record.", status: 400 });
+    }
+    if (input.records.length > 100) {
+      throw new ApiError({ code: "VALIDATION_ERROR", message: "Bulk write is limited to 100 records per approval.", status: 400 });
+    }
+
+    const rows = input.records.map((record, index) => {
+      const op: "create" | "update" = record.recordId ? "update" : "create";
+      if (!Object.keys(record.properties ?? {}).length) {
+        throw new ApiError({ code: "VALIDATION_ERROR", message: `Row ${index + 1} has no properties to write.`, status: 400 });
+      }
+      const has = (key: string) => record.properties[key] != null && String(record.properties[key]).trim() !== "";
+      if (op === "create") {
+        if (input.module === "contacts" && !["email", "firstname", "lastname"].some(has)) {
+          throw new ApiError({ code: "VALIDATION_ERROR", message: `Row ${index + 1}: new contacts need an email or first/last name.`, status: 400 });
+        }
+        if (input.module === "companies" && !["name", "domain"].some(has)) {
+          throw new ApiError({ code: "VALIDATION_ERROR", message: `Row ${index + 1}: new companies need a name or domain.`, status: 400 });
+        }
+        if (input.module === "deals" && !has("dealname")) {
+          throw new ApiError({ code: "VALIDATION_ERROR", message: `Row ${index + 1}: new deals need a dealname.`, status: 400 });
+        }
+      }
+      return { op, recordId: record.recordId ?? null, properties: record.properties };
+    });
+
+    const createCount = rows.filter((row) => row.op === "create").length;
+    const updateCount = rows.length - createCount;
+
+    const approval = await this.approvalService.createApproval({
+      workspace: currentWorkspace.workspace,
+      userId,
+      title: input.title ?? `Write ${rows.length} HubSpot ${input.module} record(s)`,
+      reason: `Bulk CRM write (${createCount} create, ${updateCount} update) requires approval.`,
+      type: "crm_bulk",
+      preview: { module: input.module, rows },
+      proposedAction: {
+        toolName: "hubspot.bulkWriteApproved",
+        actionType: "hubspot_bulk_write",
+        input,
+        requiresApproval: true,
+        riskLevel: "high",
+      },
+      riskLevel: "high",
+      sourceRefs: [],
+      idempotencyKey: createIdempotencyKey("hubspot_bulk_write", { module: input.module, records: input.records }),
+    });
+
+    return { approvalId: approval.id, rowCount: rows.length };
+  }
+
+  async executeApprovedHubSpotBulkWrite(
+    currentWorkspace: CurrentWorkspace,
+    _userId: string,
+    input: {
+      module: HubSpotModule;
+      records: Array<{ recordId?: string; properties: Record<string, unknown> }>;
+    },
+  ) {
+    const integration = await this.integrationService.requireConnection(currentWorkspace, "hubspot");
+    await this.assertHubSpotConnectionUsable(integration, "write HubSpot records");
+    const hubspotProvider = this.createHubSpotProvider();
+
+    const recordTitle = (properties: Record<string, unknown> | undefined) => {
+      const props = properties ?? {};
+      if (input.module === "contacts") {
+        return (
+          `${props["firstname"] ?? ""} ${props["lastname"] ?? ""}`.trim() || String(props["email"] ?? "Contact")
+        );
+      }
+      if (input.module === "companies") {
+        return String(props["name"] ?? props["domain"] ?? "Company");
+      }
+      return String(props["dealname"] ?? "Deal");
+    };
+
+    const results: Array<{ op: "create" | "update"; recordId: string | null; status: "ok" | "failed"; error?: string }> = [];
+    const synced: Array<Parameters<typeof this.itemRepository.syncItems>[1][number]> = [];
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
+
+    for (const record of input.records) {
+      const op: "create" | "update" = record.recordId ? "update" : "create";
+      try {
+        const written =
+          op === "update"
+            ? await hubspotProvider.updateRecord(integration, {
+                objectType: input.module,
+                recordId: record.recordId as string,
+                updates: record.properties,
+              })
+            : await hubspotProvider.createRecord(integration, {
+                objectType: input.module,
+                properties: record.properties,
+              });
+        synced.push({
+          sourceType: hubspotSourceType(input.module),
+          externalId: written.id,
+          title: recordTitle(written.properties),
+          summary: compactJson(written.properties ?? {}).slice(0, 400),
+          normalizedData: { ...written, module: input.module },
+        });
+        if (op === "update") updated += 1;
+        else created += 1;
+        results.push({ op, recordId: written.id, status: "ok" });
+      } catch (error) {
+        failed += 1;
+        results.push({
+          op,
+          recordId: record.recordId ?? null,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (synced.length) {
+      await this.itemRepository.syncItems(integration, synced);
+    }
+
+    return { results, created, updated, failed };
+  }
+
   async prepareHubSpotNoteApproval(
     currentWorkspace: CurrentWorkspace,
     userId: string,

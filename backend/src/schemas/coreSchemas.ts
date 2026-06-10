@@ -358,7 +358,7 @@ export const proposedActionSchema = z.object({
 export const approvalSchema = z.object({
   id: z.string().min(1),
   workspaceId: z.string().min(1),
-  type: z.enum(["email_send", "crm_update", "crm_create", "slack_message", "task_create", "other"]),
+  type: z.enum(["email_send", "crm_update", "crm_create", "crm_bulk", "slack_message", "task_create", "other"]),
   status: z.enum(["pending", "approved", "rejected", "edited", "executed", "failed", "cancelled"]),
   executionStatus: z.enum(["not_started", "executing", "executed", "failed"]).default("not_started"),
   executionLockId: z.string().optional(),

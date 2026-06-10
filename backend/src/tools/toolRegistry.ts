@@ -266,6 +266,20 @@ const hubspotCreateApprovalInputSchema = z.object({
 
 const hubspotCreateApprovedInputSchema = hubspotCreateApprovalInputSchema;
 
+const hubspotBulkWriteApprovalInputSchema = z.object({
+  module: hubspotWritableRecordModuleSchema,
+  title: z.string().trim().min(1).optional(),
+  records: z
+    .array(
+      z.object({
+        recordId: z.string().trim().min(1).optional(),
+        properties: z.record(z.string(), z.unknown()),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
 const hubspotNoteApprovalInputSchema = z.object({
   module: hubspotWritableRecordModuleSchema,
   recordId: z.string().trim().min(1),
@@ -1158,6 +1172,37 @@ function hubspotCreateApprovedTool(context: ToolExecutionContext) {
   );
 }
 
+function hubspotPrepareBulkWriteApprovalTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => new IntegrationWorkspaceService(context.db).prepareHubSpotBulkWriteApproval(
+      context.currentWorkspace,
+      context.userId,
+      input,
+    ),
+    {
+      name: "hubspot.prepareBulkWriteApproval",
+      description:
+        "Create ONE approval to create and/or update MANY HubSpot records at once. module MUST be 'contacts', 'companies', or 'deals'. records is an array of { recordId? (present = update that record, absent = create new), properties: HubSpot property key→value pairs }. Use this to add/update an enriched dataset to the CRM in a single human approval.",
+      schema: hubspotBulkWriteApprovalInputSchema,
+    },
+  );
+}
+
+function hubspotBulkWriteApprovedTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => new IntegrationWorkspaceService(context.db).executeApprovedHubSpotBulkWrite(
+      context.currentWorkspace,
+      context.userId,
+      input,
+    ),
+    {
+      name: "hubspot.bulkWriteApproved",
+      description: "Execute a previously approved HubSpot bulk write (create/update many records).",
+      schema: hubspotBulkWriteApprovalInputSchema,
+    },
+  );
+}
+
 function hubspotPrepareTaskCreateApprovalTool(context: ToolExecutionContext) {
   return tool(
     async (input) => new IntegrationWorkspaceService(context.db).prepareHubSpotTaskCreateApproval(
@@ -1691,6 +1736,46 @@ export const toolDefinitions: ToolDefinition[] = [
     idempotencyRequired: true,
     exposedToPlanner: false,
     buildTool: hubspotCreateApprovedTool,
+  },
+  {
+    name: "hubspot.prepareBulkWriteApproval",
+    description: "Create ONE approval to create/update many HubSpot records at once (e.g. add an enriched dataset to the CRM).",
+    inputSchema: hubspotBulkWriteApprovalInputSchema,
+    outputSchema: z.object({
+      approvalId: z.string(),
+      rowCount: z.number(),
+    }),
+    permissionsRequired: ["approvals.write"],
+    capabilitiesRequired: ["crm.write"],
+    riskLevel: "high",
+    requiresApproval: false,
+    idempotencyRequired: true,
+    buildTool: hubspotPrepareBulkWriteApprovalTool,
+  },
+  {
+    name: "hubspot.bulkWriteApproved",
+    description: "Execute a previously approved HubSpot bulk write (create/update many records).",
+    inputSchema: hubspotBulkWriteApprovalInputSchema,
+    outputSchema: z.object({
+      results: z.array(
+        z.object({
+          op: z.enum(["create", "update"]),
+          recordId: z.string().nullable(),
+          status: z.enum(["ok", "failed"]),
+          error: z.string().optional(),
+        }),
+      ),
+      created: z.number(),
+      updated: z.number(),
+      failed: z.number(),
+    }),
+    permissionsRequired: ["integrations.write"],
+    capabilitiesRequired: ["crm.write"],
+    riskLevel: "high",
+    requiresApproval: true,
+    idempotencyRequired: true,
+    exposedToPlanner: false,
+    buildTool: hubspotBulkWriteApprovedTool,
   },
   {
     name: "hubspot.prepareTaskCreateApproval",
