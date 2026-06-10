@@ -7,7 +7,7 @@ import { logger } from "../observability/logger.js";
 import { jobLockSchema, type JobLock } from "../schemas/coreSchemas.js";
 import { ApiError } from "../utils/apiError.js";
 
-export type JobType = "run_workflow" | "send_notification" | "sync_integration" | "gmail_delta_sync" | "hubspot_delta_sync" | "extract_memory_from_approval";
+export type JobType = "run_workflow" | "send_notification" | "sync_integration" | "gmail_delta_sync" | "hubspot_delta_sync" | "extract_memory_from_approval" | "exa_webset_poll";
 
 export type EnqueueJobInput = {
   workspaceId: string;
@@ -280,7 +280,7 @@ export class JobLockService {
   }
 
   assertSupportedJobType(jobType: string): asserts jobType is JobType {
-    if (!["run_workflow", "send_notification", "sync_integration", "gmail_delta_sync", "hubspot_delta_sync", "extract_memory_from_approval"].includes(jobType)) {
+    if (!["run_workflow", "send_notification", "sync_integration", "gmail_delta_sync", "hubspot_delta_sync", "extract_memory_from_approval", "exa_webset_poll"].includes(jobType)) {
       throw new ApiError({
         code: "VALIDATION_ERROR",
         message: "Unsupported worker job type.",

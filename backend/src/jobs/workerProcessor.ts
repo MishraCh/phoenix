@@ -6,6 +6,7 @@ import { GmailSyncService } from "../integrations/providers/gmail/gmailSyncServi
 import { NotificationService } from "../notifications/notificationService.js";
 import type { JobLock } from "../schemas/coreSchemas.js";
 import { processWorkflowRun } from "./workflowRunProcessor.js";
+import { processExaWebset } from "./exaTaskProcessor.js";
 import { ApprovalMemoryExtractionService } from "../memory/approvalMemoryExtractionService.js";
 
 export class WorkerProcessor {
@@ -48,6 +49,10 @@ export class WorkerProcessor {
 
     if (job.jobType === "extract_memory_from_approval") {
       return this.processMemoryExtractionJob(job);
+    }
+
+    if (job.jobType === "exa_webset_poll") {
+      return processExaWebset(this.db, job);
     }
 
     throw new Error(`Unsupported job type: ${job.jobType}`);
