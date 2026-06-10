@@ -16,6 +16,9 @@ const builtinCapabilities = [
   "web.extractUrl",
   "web.extractStructured",
   "web.monitorCheck",
+  "web.findSimilar",
+  "web.deepResearch",
+  "leads.buildDataset",
 ];
 
 const usableIntegrationStatuses = new Set(["connected", "syncing"]);

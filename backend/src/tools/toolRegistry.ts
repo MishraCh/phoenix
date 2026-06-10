@@ -15,6 +15,7 @@ import { ApiError } from "../utils/apiError.js";
 import { ClaimSafetyService } from "../ai/safety/claimSafetyService.js";
 import { IntegrationWorkspaceService } from "../integrations/integrationWorkspaceService.js";
 import { WebIntelligenceService } from "../web/webIntelligenceService.js";
+import { ExaSearchProvider } from "../web/providers/exaSearchProvider.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
 export type ToolExecutionContext = {
@@ -104,6 +105,11 @@ const webExtractUrlInputSchema = z.object({
   searchQueries: z.array(z.string().trim().min(1)).max(5).optional(),
   includeFullContent: z.boolean().default(false),
   sessionId: z.string().trim().min(1).optional(),
+});
+
+const webFindSimilarInputSchema = z.object({
+  url: z.string().url(),
+  numResults: z.number().int().min(1).max(20).optional(),
 });
 
 const webExtractStructuredInputSchema = z.object({
@@ -502,6 +508,26 @@ function webExtractUrlTool(context: ToolExecutionContext) {
       name: "web.extractUrl",
       description: "Extract LLM-ready content from one or more known public URLs.",
       schema: webExtractUrlInputSchema,
+    },
+  );
+}
+
+function webFindSimilarTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      void context;
+      const sourceRefs = await new ExaSearchProvider().findSimilar(input.url, input.numResults);
+      return {
+        status: "completed",
+        url: input.url,
+        count: sourceRefs.length,
+        sourceRefs,
+      };
+    },
+    {
+      name: "web.findSimilar",
+      description: "Discover web pages similar/related to a known URL (related-source enrichment).",
+      schema: webFindSimilarInputSchema,
     },
   );
 }
@@ -1688,6 +1714,23 @@ export const toolDefinitions: ToolDefinition[] = [
     requiresApproval: false,
     idempotencyRequired: false,
     buildTool: webExtractUrlTool,
+  },
+  {
+    name: "web.findSimilar",
+    description: "Find web pages similar/related to a known URL (related-source enrichment).",
+    inputSchema: webFindSimilarInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      url: z.string(),
+      count: z.number(),
+      sourceRefs: z.array(z.record(z.string(), z.unknown())),
+    }),
+    permissionsRequired: ["web.read"],
+    capabilitiesRequired: ["web.findSimilar"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: webFindSimilarTool,
   },
   {
     name: "web.extractStructured",

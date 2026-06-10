@@ -89,4 +89,51 @@ export class ExaSearchProvider {
       });
     }
   }
+
+  /**
+   * Find sources similar to a given URL (related-source discovery / enrichment).
+   * Returns web SourceRefs; excludes the source domain so results are genuinely related.
+   */
+  async findSimilar(url: string, numResults = 8): Promise<SourceRef[]> {
+    if (!env.EXA_API_KEY) {
+      throw new ApiError({
+        code: "WEB_PROVIDER_CONFIG_MISSING",
+        message: "EXA_API_KEY is required for Exa find-similar.",
+        status: 500,
+      });
+    }
+
+    const exa = new Exa(env.EXA_API_KEY);
+    try {
+      const response = (await exa.findSimilarAndContents(url, {
+        numResults,
+        excludeSourceDomain: true,
+        text: { maxCharacters: 800 },
+      })) as unknown as { results?: Array<{ url?: string; title?: string }> };
+
+      const results = Array.isArray(response.results) ? response.results : [];
+      return results
+        .filter((result): result is { url: string; title?: string } => typeof result.url === "string")
+        .map((result) =>
+          sourceRefSchema.parse({
+            sourceType: "web",
+            sourceId: hashValue(`exa_find_similar:${result.url}`),
+            title: result.title ?? "Related result",
+            url: result.url,
+            fetchedAt: Timestamp.now(),
+            provider: "exa_find_similar",
+          }),
+        );
+    } catch (error) {
+      logger.warn("Exa find-similar failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new ApiError({
+        code: "WEB_PROVIDER_REQUEST_FAILED",
+        message: `Failed to find similar sources via Exa for: ${url}`,
+        status: 502,
+        details: { error: error instanceof Error ? error.message : String(error) },
+      });
+    }
+  }
 }
