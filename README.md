@@ -1,156 +1,84 @@
-# Gideon
+<p align="center">
+  <img src="frontend/public/phoenix-wordmark.png" alt="Phoenix AI" width="320" />
+</p>
 
-**Agentic Operating Layer for Founders and Operators**
+<h3 align="center">The AI Chief of Staff workspace — powered by Gideon, its agentic brain</h3>
 
-Gideon is a multimodal, agentic operating layer engineered for high-leverage workflows. It provides a unified command surface to autonomously research, draft, orchestrate, and execute operations across SaaS ecosystems like HubSpot and Google Workspace. Powered by a deterministic approval state machine, every external write is strictly gated before execution. The underlying cognitive architecture leverages LangGraph-based cyclic orchestration, dynamic capability manifests, and a continuously learning vector memory layer.
+---
 
-## Product Surfaces
+**Phoenix** is an operational AI platform for founders and operators. **Gideon**, the agentic brain inside Phoenix, researches, drafts, enriches CRM data, and orchestrates work across your connected systems — and every external write is gated behind a human approval, right in the chat.
+
+## What it does
+
+- **Agentic command center** — one conversational surface where Gideon plans and acts in multiple steps: web research with citations, deep-dive reports, CRM queries, enrichment, and proposed actions, all streamed live.
+- **Human-in-the-loop approvals** — Gideon never writes externally on its own. Creating a HubSpot contact, updating a deal, sending a payment link: each lands as an approval card in chat with **Approve** and **Edit before approval**. Bulk CRM write-backs go through one batch approval.
+- **CRM enrichment loop** — query your HubSpot data, enrich it from the live web (industry, headcount, funding…), build lead datasets, and write the results back through a single gated approval.
+- **Workflows** — chat-created and visually edited automations with scheduled or manual triggers and step-level run tracing.
+- **3-tier memory** — working conversation memory, an active-entity register for natural follow-ups ("update *its* record"), and long-term vector memory over workspace facts and past sessions.
+- **Six agent personas** — Executive, Sales, Research, Operations, Customer, and Recruiting specialists with scoped tools and behavior rules.
+- **Billing on Stripe** — Free / Plus / Pro workspace plans via Stripe Checkout (promo codes supported), Customer Portal, and webhook-driven fulfillment. Stripe also connects as an integration: revenue dashboard plus approval-gated payment links.
+
+## Product surfaces
 
 | Surface | Route | Purpose |
 |---------|-------|---------|
-| **Command Center** | `/` | Primary interface: conversational commands with structured AI responses, inline approvals, and session continuity. |
-| **Agents** | `/agents` | Six specialist assistants (Executive, Sales, Research, Operations, Customer, Recruiting), each with scoped tools, behavior rules, and output formats. |
-| **Workflows** | `/workflows` | Prebuilt and custom automations: scheduled or manual triggers, step-level execution tracing, and visual canvas editor. |
-| **Approvals** | `/approvals` | Every external write (email, CRM update, Slack message) lands here: review, edit, approve, or reject before Gideon acts. |
-| **Library** | `/library` | Agent-generated artifacts: reports, briefs, and drafts with source attribution and freshness metadata. |
-| **Memory & Knowledge** | `/context` | Workspace facts, user preferences, and patterns extracted from sessions, confirmed by the user. |
-| **Integrations** | `/integrations` | Connect Gmail and HubSpot: each with a dedicated workspace UI for reading and acting on records. |
-| **Settings** | `/settings` | Profile, workspace, members, billing, security, and appearance management. |
-
-## Core Capabilities
-
-### 1. Unified Agentic Command Center
-A singular conversational interface designed for multi-step autonomous execution. Instead of navigating siloed SaaS dashboards, operators command Gideon to dynamically chain RAG retrieval, web scraping, and API mutations in a single natural language prompt.
-
-### 2. Specialized Cognitive Agents
-Gideon deploys six domain-specific, autonomous agents (Executive, Sales, Research, Operations, Customer, Recruiting). Each agent is isolated with specific behavior heuristics, scoped LangChain tool access, and deterministic output schemas for targeted workflow execution.
-
-### 3. Bidirectional CRM Orchestration
-Native read/write integration with HubSpot via encrypted OAuth flows. Gideon autonomously hydrates CRM contexts, generates semantic account summaries, drafts context-aware notes, and executes deterministic mutations to deal pipelines and contact properties.
-
-### 4. Context-Aware Communication Intelligence
-Deep integration with the Gmail API. Gideon executes semantic chunking on complex email threads to extract actionable insights, while utilizing few-shot prompting against your historical sent messages to draft stylistically authentic outbound replies.
-
-### 5. Asynchronous Workflow Execution
-A robust automation engine for scheduled and event-driven data pipelines. Workflows are processed via Upstash QStash webhooks, triggering concurrent web crawler execution and API interactions to synthesize and deliver high-fidelity artifacts asynchronously.
-
-### 6. The Approval Gateway & Claim Safety
-Zero-trust execution architecture. Every deterministic external action (API mutations, email dispatch) lands in a strict Approval Gateway. An asynchronous "Claim Safety" neural guardrail cross-verifies drafted content against origin source data to prevent hallucinated variables prior to manual user validation.
-
-### 7. Persistent Vector Memory Layer
-Continuous, passive cognitive learning. Gideon executes named-entity recognition and preference extraction from user interactions, persisting unstructured data into an OpenAI-embedded vector database. This powers dynamic prompt hydration for deeply personalized, context-aware responses across all future sessions.
-
-### 8. Immutable Artifact Library
-High-value outputs (Market Research, Playbooks, Funding Shortlists) are compiled into version-controlled, immutable Artifacts. Each generation strictly enforces RAG-backed source citations and freshness telemetry for complete auditability.
+| Command Center | `/command-center` | Conversational commands, streaming responses, inline approval cards |
+| Agents | `/agents` | Specialist personas with scoped tools |
+| Workflows | `/workflows` | Automations with triggers, runs, and a visual canvas |
+| Approvals | `/approvals` | Review, edit, approve, or reject every external write |
+| Library | `/library` | Saved artifacts: reports, briefs, drafts with sources |
+| Memory & Knowledge | `/context` | What Gideon knows about your workspace |
+| Integrations | `/integrations` | HubSpot and Stripe live today; Gmail coming soon |
+| Settings | `/settings` | Profile, response style, billing, workspace management |
 
 ## Architecture
 
-* **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui
-* **Backend:** Node.js, Express 5, TypeScript, LangGraph.js, Firebase Admin
-* **Worker:** Separate runtime process (`backend/src/worker.ts`)
+- **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend:** Node.js, Express 5, TypeScript, Firebase Auth + Firestore
+- **AI:** Vercel AI SDK v6 (`ToolLoopAgent`) through **Vercel AI Gateway** — Claude Sonnet 4.5 by default, automatic provider fallback, 1536-dim embeddings for Firestore vector search
+- **Web intelligence:** **Exa** — grounded answers, search + contents, find-similar, fast/deep research tasks, and entity enrichment
+- **Payments:** Stripe Checkout subscriptions, Customer Portal, raw-body webhooks, restricted-key integration connect
+- **Safety:** policy engine classifies every tool call; high-risk actions become approvals via typed `prepare*Approval` tools; executors run only after human approval
 
-### AI Intelligence Layer
+```
+backend/src/
+  ai/agentic/      ToolLoopAgent service, tool adapter (policy guardrails), prompts
+  ai/providers/    Gateway LLM + embedding providers (OpenAI fallback)
+  tools/           Tool registry — web, CRM, Stripe, artifacts, approvals, workflows
+  approvals/       Approval state machine (create / edit / approve / execute / fail)
+  integrations/    HubSpot + Stripe workspace services, encrypted token store
+  workflows/       Draft service, sanitizer, run engine
+  payments/        Stripe billing (checkout, portal, webhook fulfillment)
+  memory/          Session compression, memory promotion, vector retrieval
+```
 
-All LLM calls are contained in `backend/src/ai/`. The core execution engine uses a LangGraph StateGraph that handles mode resolution, Retrieval-Augmented Generation (RAG), web research, and tool execution.
+## Local development
 
-**Sub-modules:**
+**Requirements:** Node.js 18.18+, a Firebase project (Auth + Firestore), Vercel AI Gateway key, Exa API key, Stripe test keys.
 
-| Module | Purpose |
-|--------|---------|
-| `ai/providers/` | OpenAI LLM and embedding adapters |
-| `ai/manifests/` | Dynamic capability manifest injected into every planner prompt |
-| `ai/prompts/` | Composable prompt builder with persona and SOP injections |
-| `ai/sops/` | Semantic retrieval of operating procedures matched to the user's intent |
-| `ai/context/` | Assembles user profile, integration status, agent list, and workspace state |
-| `ai/retrieval/` | Firestore vector search across artifacts, memory, and compressed session summaries |
-| `ai/safety/` | Safety classification, claim verification, and approval routing |
-| `ai/agents/` | Per-agent graph node configurations |
-
-## Backend Services
-
-| Service | Responsibility |
-|---------|---------------|
-| `CommandGraphService` | LangGraph command execution engine |
-| `GideonManifestService` | Real-time capability manifest builder |
-| `WorkspaceContextService` | Context assembly: user profile, integrations, agents |
-| `CommandSessionService` | Session lifecycle, compression, memory promotion |
-| `RetrievalService` | Vector search across workspace knowledge |
-| `ApprovalService` | Create, edit, approve, reject with full state machine |
-| `ArtifactService` | Artifact storage with source refs and freshness tracking |
-| `WorkflowService` | Workflow CRUD, activation, step execution, run state |
-| `JobLockService` | Firestore-backed job queue: transactional claiming, QStash webhook delivery |
-| `MemoryService` | Workspace memory nodes: deduplication, user confirmation |
-| `PolicyService` | Risk classification and approval routing |
-| `IntegrationService` | OAuth flows, AES-256 encrypted token storage, delta sync |
-
-## Worker and Real-Time Layer
-
-The worker is a separate Node.js process (`backend/src/worker.ts`) that receives jobs via **Upstash QStash webhooks** (signed, verified) and processes workflows, agent runs, notifications, and integration syncs.
-
-Server-sent events (`backend/src/sse/`) push events to the frontend:
-* `command.progress`: Live status copy during command execution
-* `approval.created`: New approval badge in the UI
-* `workflow.status`: Step-level progress
-* `notification.new`: In-app alerts
-
-## Billing & Access
-
-No payment gateway. Plans are workspace-based, upgraded via **coupon codes**.
-
-**Coupon codes:** Upgrade plan and grant credits (`POST /billing/apply-coupon`).
-**Invite codes:** Add a user to a workspace (`POST /workspaces/:id/join`).
-These are distinct systems and must not be conflated.
-
-## Local Development
-
-### Requirements
-* Node.js 18.18+ (tested on 22.11.0)
-* Firebase project with Authentication and Firestore enabled
-* OpenAI API Key
-
-### 1. Frontend
 ```bash
+# Frontend
 cd frontend
 cp .env.example .env.local
 npm install
 npm run dev
-```
 
-### 2. Backend API
-```bash
+# Backend API (separate terminal)
 cd backend
-cp .env.example .env
+cp .env.example .env   # fill in keys
 npm install
 npm run dev
-```
 
-### 3. Worker (separate terminal)
-```bash
+# Background worker (separate terminal)
 cd backend
 npm run worker
 ```
 
-## Scripts
+Deploy the Firestore indexes once: `firebase deploy --only firestore:indexes`.
 
-**Frontend:**
+## Testing
+
 ```bash
-npm run dev       # Next.js dev server
-npm run build     # Production build
-npm run start     # Serve production build
+cd backend && npx vitest run    # unit + behavior suites (no mocks for live-verified paths)
+cd frontend && npx vitest run
 ```
-
-**Backend:**
-```bash
-npm run dev                       # API server (tsx watch)
-npm run worker                    # Background worker (tsx watch)
-npm run build                     # Compile to dist/
-npm run start                     # Run compiled build
-npm run eval:intelligence         # Run evaluation suite (requires Firestore emulator)
-```
-
-## Current Status and Roadmap
-
-* **OpenAI Migration:** Complete. All legacy APIs have been replaced with dedicated OpenAI and LangGraph architectures.
-* **Workflow Intelligence:** Hardened. Background steps process data efficiently without conversational hallucinations.
-* **File Uploads:** In development. Users will soon be able to upload documents or PDFs as context sources.
-* **Production Integrations:** Gmail OAuth and HubSpot are undergoing final verification and end-to-end testing before full public release.

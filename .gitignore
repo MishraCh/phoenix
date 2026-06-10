@@ -49,4 +49,6 @@ coverage/
 .turbo/
 .vercel/
 
+# ── Internal (not for the public repo) ────────────────────────
 docs/
+.github/
