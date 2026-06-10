@@ -17,6 +17,8 @@ import { IntegrationWorkspaceService } from "../integrations/integrationWorkspac
 import { WebIntelligenceService } from "../web/webIntelligenceService.js";
 import { ExaSearchProvider } from "../web/providers/exaSearchProvider.js";
 import { ExaResearchProvider, ResearchTimeoutError } from "../web/providers/exaResearchProvider.js";
+import { ExaWebsetsProvider } from "../web/providers/exaWebsetsProvider.js";
+import { JobLockService } from "../jobs/jobLockService.js";
 import { WorkflowService } from "../workflows/workflowService.js";
 
 export type ToolExecutionContext = {
@@ -116,6 +118,21 @@ const webFindSimilarInputSchema = z.object({
 const webDeepResearchInputSchema = z.object({
   query: z.string().trim().min(1),
   effort: z.enum(["low", "medium", "high"]).optional(),
+});
+
+const leadsBuildDatasetInputSchema = z.object({
+  query: z.string().trim().min(1),
+  count: z.number().int().min(1).max(50).optional(),
+  entity: z.enum(["company", "person"]).optional(),
+  enrichments: z
+    .array(
+      z.object({
+        description: z.string().trim().min(1),
+        format: z.enum(["text", "number", "email", "url", "date"]).optional(),
+      }),
+    )
+    .max(10)
+    .optional(),
 });
 
 const webExtractStructuredInputSchema = z.object({
@@ -514,6 +531,37 @@ function webExtractUrlTool(context: ToolExecutionContext) {
       name: "web.extractUrl",
       description: "Extract LLM-ready content from one or more known public URLs.",
       schema: webExtractUrlInputSchema,
+    },
+  );
+}
+
+function leadsBuildDatasetTool(context: ToolExecutionContext) {
+  return tool(
+    async (input) => {
+      const { websetId } = await new ExaWebsetsProvider().create({
+        query: input.query,
+        count: input.count,
+        entity: input.entity,
+        enrichments: input.enrichments,
+      });
+      const label = input.query.length > 80 ? `${input.query.slice(0, 77)}…` : input.query;
+      await new JobLockService(context.db).enqueueJob({
+        workspaceId: context.currentWorkspace.id,
+        jobType: "exa_webset_poll",
+        userId: context.userId,
+        input: { websetId, label, entity: input.entity ?? "company", query: input.query },
+      });
+      return {
+        status: "started",
+        websetId,
+        message: `Building your enriched dataset "${label}" — I'll save it to your Library and notify you when it's ready.`,
+      };
+    },
+    {
+      name: "leads.buildDataset",
+      description:
+        "Build an enriched lead dataset (companies or people) from the web using Exa Websets. Runs in the background; saves a dataset to the Library and notifies when ready. Specify enrichment columns (e.g. funding, employee count, CEO email).",
+      schema: leadsBuildDatasetInputSchema,
     },
   );
 }
@@ -1760,6 +1808,22 @@ export const toolDefinitions: ToolDefinition[] = [
     requiresApproval: false,
     idempotencyRequired: false,
     buildTool: webExtractUrlTool,
+  },
+  {
+    name: "leads.buildDataset",
+    description: "Build an enriched lead dataset (companies/people) via Exa Websets; saves to Library + notifies.",
+    inputSchema: leadsBuildDatasetInputSchema,
+    outputSchema: z.object({
+      status: z.string(),
+      websetId: z.string(),
+      message: z.string(),
+    }),
+    permissionsRequired: ["web.read"],
+    capabilitiesRequired: ["leads.buildDataset"],
+    riskLevel: "low",
+    requiresApproval: false,
+    idempotencyRequired: false,
+    buildTool: leadsBuildDatasetTool,
   },
   {
     name: "web.deepResearch",
