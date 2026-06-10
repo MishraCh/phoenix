@@ -11,3 +11,18 @@ export function applyCoupon(firebaseIdToken: string, couponCode: string) {
     body: JSON.stringify({ couponCode }),
   });
 }
+
+export function createStripeCheckout(firebaseIdToken: string, plan: "plus" | "pro") {
+  return apiFetch<{ url: string | null }>("/billing/checkout", {
+    firebaseIdToken,
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export function openStripePortal(firebaseIdToken: string) {
+  return apiFetch<{ url: string }>("/billing/portal", {
+    firebaseIdToken,
+    method: "POST",
+  });
+}

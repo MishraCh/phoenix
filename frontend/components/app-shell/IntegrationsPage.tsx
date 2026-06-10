@@ -35,7 +35,7 @@ const providerCatalog = [
   {
     category: "Communication",
     items: [
-      { id: "gmail", name: "Gmail", icon: Mail, iconBg: "bg-[#4285F4]", iconText: "text-white", unlocks: ["Inbox triage", "Draft follow-up", "Thread context", "Approval-gated sending"], desc: "Bring Gmail threads into Gideon so it can summarize, draft replies, and turn email into workflows." },
+      { id: "gmail", name: "Gmail", icon: Mail, iconBg: "bg-[#4285F4]", iconText: "text-white", unlocks: ["Inbox triage", "Draft follow-up", "Thread context", "Coming soon"], desc: "Gmail is coming soon — Gideon will summarize threads, draft replies, and turn email into workflows." },
       { id: "slack", name: "Slack", icon: MessageSquare, iconBg: "bg-[#4A154B]", iconText: "text-white", unlocks: ["Channel summaries", "Draft responses", "Action extraction", "Coming soon"], desc: "Connect Slack to let Gideon monitor important channels and draft updates." },
     ]
   },
@@ -51,7 +51,7 @@ const providerCatalog = [
     items: [
       { id: "hubspot", name: "HubSpot", icon: Database, iconBg: "bg-[#FF7A59]", iconText: "text-white", unlocks: ["Lead context", "Pipeline visibility", "Notes and tasks", "Approval-gated CRM actions"], desc: "Bring in deal context, contact history, and CRM execution support for sales workflows." },
       { id: "salesforce", name: "Salesforce", icon: Cloud, iconBg: "bg-[#00A1E0]", iconText: "text-white", unlocks: ["Account updates", "Opportunity tracking", "Coming soon"], desc: "Connect Salesforce for enterprise CRM context." },
-      { id: "stripe", name: "Stripe", icon: CreditCard, iconBg: "bg-[#635BFF]", iconText: "text-white", unlocks: ["Revenue alerts", "Customer billing", "Coming soon"], desc: "Keep track of customer subscriptions and revenue milestones." },
+      { id: "stripe", name: "Stripe", icon: CreditCard, iconBg: "bg-[#635BFF]", iconText: "text-white", unlocks: ["Revenue insights", "Agent-queryable payments", "Approval-gated payment links"], desc: "Connect Stripe so Gideon can answer revenue questions and create payment links with your approval." },
     ]
   },
   {
@@ -148,7 +148,7 @@ export function IntegrationsPage() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {activeIntegrations.map((provider) => {
                         const liveIntegration = integrations.find((integration) => integration.provider === provider.id) ?? null;
-                        const isWorkspaceReady = provider.id === "gmail" || provider.id === "hubspot";
+                        const isWorkspaceReady = provider.id === "hubspot" || provider.id === "stripe";
 
                         return (
                           <Card key={provider.id} className="transition-[border-color,box-shadow] duration-150 hover:border-primary/25 hover:shadow-sm">
@@ -194,7 +194,7 @@ export function IntegrationsPage() {
                           integrations.find((integration) => integration.provider === provider.id) ??
                           fallbackIntegrations.find((integration) => integration.provider === provider.id) ??
                           null;
-                        const isWorkspaceReady = provider.id === "gmail" || provider.id === "hubspot";
+                        const isWorkspaceReady = provider.id === "hubspot" || provider.id === "stripe";
 
                         return (
                           <Card key={provider.id} className="transition-[border-color,box-shadow] duration-150 hover:border-primary/25 hover:shadow-sm">

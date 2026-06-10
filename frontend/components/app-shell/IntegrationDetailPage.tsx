@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Building2,
   CheckSquare,
+  CreditCard,
   Database,
   LockKeyhole,
   Mail,
@@ -78,6 +79,21 @@ const INTEGRATION_META: Record<
       { title: "Workflow Automation", desc: "Extract action items and push them to your task manager.", icon: Workflow },
     ],
   },
+  stripe: {
+    label: "Stripe",
+    icon: CreditCard,
+    description: "Connect Stripe so Gideon can answer revenue questions, surface customers and payments, and create payment links with your approval.",
+    workspacePath: "/integrations/stripe/workspace",
+    theme: "from-indigo-500/20 via-violet-500/5 to-transparent",
+    accent: "text-indigo-600 bg-indigo-500/10 border-indigo-500/20",
+    iconBg: "bg-[#635BFF]",
+    iconText: "text-white",
+    capabilities: [
+      { title: "Revenue Insights", desc: "Ask about volume, payments, and subscriptions in plain language.", icon: Sparkles },
+      { title: "Payments Workspace", desc: "Customers, payments, and subscriptions at a glance.", icon: Database },
+      { title: "Approval-Gated Links", desc: "Payment links are only created after you approve.", icon: ShieldCheck },
+    ],
+  },
   hubspot: {
     label: "HubSpot CRM",
     icon: Building2,
@@ -98,7 +114,8 @@ const INTEGRATION_META: Record<
 export function IntegrationDetailPage({ provider }: IntegrationDetailPageProps) {
   const normalizedProvider = provider === "google" ? "gmail" : provider;
   const logoProvider = provider === "gmail" ? "google" : normalizedProvider;
-  const isFrontendEnabled = normalizedProvider === "gmail" || normalizedProvider === "hubspot";
+  const isFrontendEnabled = normalizedProvider === "gmail" || normalizedProvider === "hubspot" || normalizedProvider === "stripe";
+  const isComingSoon = normalizedProvider === "gmail";
   const { idToken } = useAuth();
   const { pushToast } = useToast();
   const integrationQuery = useIntegrationDetailQuery(normalizedProvider);
@@ -180,6 +197,22 @@ export function IntegrationDetailPage({ provider }: IntegrationDetailPageProps) 
                   </Button>
                 ) : null}
               </div>
+            ) : isComingSoon ? (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <span className="rounded-full border border-border/60 bg-secondary/60 px-5 py-2 text-sm font-semibold text-muted-foreground">
+                  Coming soon
+                </span>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  Gmail is on the way. Connect HubSpot or Stripe in the meantime.
+                </p>
+              </div>
+            ) : normalizedProvider === "stripe" ? (
+              <Button asChild size="lg" className="mt-4 rounded-full shadow-md px-8">
+                <Link href="/integrations/stripe/workspace">
+                  Connect with API key
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+              </Button>
             ) : (
               <Button size="lg" className="mt-4 rounded-full shadow-md px-8" onClick={() => void handleConnect()} disabled={!idToken}>
                 Connect {meta?.label ?? provider}

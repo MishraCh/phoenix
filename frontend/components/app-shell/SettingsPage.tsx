@@ -22,7 +22,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { getFriendlyErrorMessage } from "@/lib/product";
 import { cn } from "@/lib/utils";
 import { updateProfile } from "firebase/auth";
-import { applyCoupon } from "@/services/billing";
+import { applyCoupon, createStripeCheckout, openStripePortal } from "@/services/billing";
 import { updateWorkspaceSettings, type WorkspaceDetail, type WorkspaceListItem, type WorkspaceProfile } from "@/services/workspaces";
 
 import { ProductHeader } from "./ProductHeader";
@@ -166,6 +166,32 @@ export function SettingsPage() {
       const message = getFriendlyErrorMessage(nextError, "We couldn't apply that code yet.");
       setActionError(message);
       pushToast({ title: "Code needs attention", description: message, tone: "error" });
+    }
+  }
+
+  async function handleStripeCheckout(plan: "plus" | "pro") {
+    if (!idToken) return;
+    try {
+      const { url } = await createStripeCheckout(idToken, plan);
+      if (url) {
+        window.location.assign(url);
+      } else {
+        pushToast({ title: "Checkout unavailable", description: "Stripe did not return a checkout URL.", tone: "error" });
+      }
+    } catch (nextError) {
+      const message = getFriendlyErrorMessage(nextError, "Stripe checkout isn't configured yet.");
+      pushToast({ title: "Checkout needs attention", description: message, tone: "error" });
+    }
+  }
+
+  async function handleStripePortal() {
+    if (!idToken) return;
+    try {
+      const { url } = await openStripePortal(idToken);
+      window.location.assign(url);
+    } catch (nextError) {
+      const message = getFriendlyErrorMessage(nextError, "Billing portal is unavailable.");
+      pushToast({ title: "Portal needs attention", description: message, tone: "error" });
     }
   }
 
@@ -574,24 +600,51 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-5">
-              <SectionHeader eyebrow="Upgrade" title="Apply workspace code" />
-              <form onSubmit={handleApplyCoupon} className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium" htmlFor="coupon-code">Code</label>
-                  <Input
-                    id="coupon-code"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="PLUS2026"
-                    className="mt-1.5 h-9"
-                  />
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-5">
+                <SectionHeader eyebrow="Upgrade" title="Subscribe with Stripe" />
+                <p className="text-xs text-muted-foreground">
+                  Secure checkout via Stripe. Promo codes can be entered at checkout; manage or cancel anytime.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button
+                    variant={snapshot.workspace.plan === "plus" ? "outline" : "default"}
+                    onClick={() => void handleStripeCheckout("plus")}
+                  >
+                    Upgrade to Plus
+                  </Button>
+                  <Button
+                    variant={snapshot.workspace.plan === "pro" ? "outline" : "default"}
+                    onClick={() => void handleStripeCheckout("pro")}
+                  >
+                    Upgrade to Pro
+                  </Button>
                 </div>
-                <Button type="submit" className="w-full">Apply code</Button>
-              </form>
-            </CardContent>
-          </Card>
+                <Button variant="ghost" className="mt-2 w-full text-xs" onClick={() => void handleStripePortal()}>
+                  Manage billing (Stripe customer portal)
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <SectionHeader eyebrow="Upgrade" title="Apply workspace code" />
+                <form onSubmit={handleApplyCoupon} className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium" htmlFor="coupon-code">Code</label>
+                    <Input
+                      id="coupon-code"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="PLUS2026"
+                      className="mt-1.5 h-9"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Apply code</Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       );
     }

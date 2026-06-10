@@ -6,6 +6,7 @@ import { CrmTaskApprovalCard } from "./CrmTaskApprovalCard";
 import { CrmNoteApprovalCard } from "./CrmNoteApprovalCard";
 import { CrmUpdateApprovalCard } from "./CrmUpdateApprovalCard";
 import { CrmBulkApprovalCard } from "./CrmBulkApprovalCard";
+import { PaymentLinkApprovalCard } from "./PaymentLinkApprovalCard";
 
 export function CrmApprovalRouter({
   approvalId,
@@ -51,6 +52,10 @@ export function CrmApprovalRouter({
 
   if (actionType === "hubspot_bulk_write") {
     return <CrmBulkApprovalCard approval={approval} messageId={messageId} defaultStatus={defaultStatus} onEdit={onEdit} onApprove={onApprove} />;
+  }
+
+  if (actionType === "stripe_payment_link") {
+    return <PaymentLinkApprovalCard approval={approval} messageId={messageId} defaultStatus={defaultStatus} onEdit={onEdit} onApprove={onApprove} />;
   }
 
   return <div>Unknown CRM approval action type: {String(actionType)}</div>;

@@ -695,7 +695,9 @@ export function CommandResponseBody({
 }: CommandResponseBodyProps) {
   const result = response.result;
   const isCrmApproval =
-    response.createdApproval && response.createdApproval.actionType?.startsWith("hubspot_");
+    response.createdApproval &&
+    (response.createdApproval.actionType?.startsWith("hubspot_") ||
+      response.createdApproval.actionType?.startsWith("stripe_"));
 
   const renderApproval = () => {
     if (!isCrmApproval || !response.createdApproval) return null;

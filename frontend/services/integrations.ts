@@ -270,6 +270,49 @@ export function disconnectIntegration(firebaseIdToken: string, provider: string)
   });
 }
 
+export type StripeOverview = {
+  revenue: {
+    grossVolume30d: number;
+    currency: string;
+    paymentsCount30d: number;
+    activeSubscriptions: number;
+  };
+  customers: Array<{ id: string; name: string | null; email: string | null; created: string | null }>;
+  payments: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    description: string | null;
+    customerEmail: string | null;
+    created: string | null;
+  }>;
+  subscriptions: Array<{
+    id: string;
+    status: string;
+    customerId: string | null;
+    amount: number | null;
+    currency: string | null;
+    interval: string | null;
+    created: string | null;
+  }>;
+};
+
+export function connectStripeWithKey(firebaseIdToken: string, apiKey: string) {
+  return apiFetch<{ status: "connected" }>("/integrations/stripe/connect-key", {
+    firebaseIdToken,
+    method: "POST",
+    body: JSON.stringify({ apiKey }),
+  });
+}
+
+export function fetchStripeOverview(firebaseIdToken: string) {
+  return apiFetch<StripeOverview>("/integrations/stripe/overview", {
+    firebaseIdToken,
+    method: "GET",
+  });
+}
+
 export function syncIntegration(firebaseIdToken: string, provider: string) {
   return apiFetch<{ status: string; jobId: string }>(`/integrations/${provider}/sync`, {
     firebaseIdToken,
