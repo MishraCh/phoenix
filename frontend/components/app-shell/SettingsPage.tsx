@@ -232,7 +232,12 @@ export function SettingsPage() {
     if (!idToken || !selectedWorkspace?.id) return;
     setSavingProfile(true);
     try {
-      await updateWorkspaceSettings(idToken, selectedWorkspace.id, { profile: effectiveProfile });
+      // Strip cleared ("") fields — the backend enum/string validators reject empty strings,
+      // and omitting a key removes it since the profile map is replaced wholesale.
+      const cleanedProfile = Object.fromEntries(
+        Object.entries(effectiveProfile).filter(([, value]) => value !== "" && value !== undefined && value !== null),
+      ) as WorkspaceProfile;
+      await updateWorkspaceSettings(idToken, selectedWorkspace.id, { profile: cleanedProfile });
       pushToast({ title: "AI context saved", description: "Gideon will use this in all responses.", tone: "success" });
       setProfileDraft(null);
       await queryClient.invalidateQueries({
@@ -495,6 +500,42 @@ export function SettingsPage() {
                     placeholder="Anything else Gideon should always know — pricing model, geographic focus, compliance constraints, deal size, sales motion…"
                     disabled={!isProfileOwnerOrAdmin}
                     rows={3}
+                    className="resize-none text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Response style</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      { value: "concise", label: "Concise" },
+                      { value: "balanced", label: "Balanced" },
+                      { value: "detailed", label: "Detailed" },
+                    ] as const).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={!isProfileOwnerOrAdmin}
+                        onClick={() => setProfile("responseTone", value === effectiveProfile.responseTone ? "" : value)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          effectiveProfile.responseTone === value
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                        } disabled:pointer-events-none disabled:opacity-50`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">How long and deep Gideon's answers are by default. Asking for a different style in a message always overrides this.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Style notes</label>
+                  <Textarea
+                    value={effectiveProfile.responseStyleNotes ?? ""}
+                    onChange={(e) => setProfile("responseStyleNotes", e.target.value)}
+                    placeholder="E.g. bullet points over prose, no fluff, always cite sources inline, executive-summary first…"
+                    disabled={!isProfileOwnerOrAdmin}
+                    rows={2}
                     className="resize-none text-sm"
                   />
                 </div>

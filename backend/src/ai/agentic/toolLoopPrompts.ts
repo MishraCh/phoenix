@@ -18,7 +18,23 @@ export function buildToolLoopInstructions(input: AgentRunInput, memoryBlock?: st
     "Ground every factual claim in tool results and preserve source URLs.",
     "NEVER perform an external write directly. To send email or change CRM data, call a prepare*Approval tool to PROPOSE the action — a human approves it later. If a tool returns status 'approval_required' or 'blocked', do not retry it; either propose via a prepare*Approval tool or stop and summarize.",
     "When you have enough information, stop and give a concise, well-structured final answer.",
+    "STYLE: match the user's requested style and length — if they ask for a concise/brief answer, keep it short even after deep research (research depth stays the same; only the write-up compresses).",
   ];
+
+  const profile = (input.currentWorkspace?.workspace as { profile?: { responseTone?: string; responseStyleNotes?: string } } | undefined)?.profile;
+  if (profile?.responseTone || profile?.responseStyleNotes?.trim()) {
+    const toneCopy =
+      profile.responseTone === "concise"
+        ? "concise — short, direct answers; only expand when asked"
+        : profile.responseTone === "detailed"
+          ? "detailed — thorough answers with full reasoning and structure"
+          : profile.responseTone === "balanced"
+            ? "balanced — clear structure without unnecessary length"
+            : "";
+    parts.push(
+      `WORKSPACE RESPONSE STYLE (default unless the user asks otherwise): ${[toneCopy, profile.responseStyleNotes?.trim()].filter(Boolean).join(". ")}`,
+    );
+  }
   if (input.agentSystemPromptAddition) {
     parts.push(`\nAGENT PERSONA:\n${input.agentSystemPromptAddition}`);
   }

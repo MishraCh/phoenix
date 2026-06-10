@@ -42,9 +42,11 @@ export function formatWorkspaceIdentityBlock(profile: WorkspaceProfile | undefin
   const industry = profile.industry?.trim();
   const stage = profile.stage;
   const extra = profile.additionalContext?.trim();
+  const responseTone = profile.responseTone;
+  const responseStyleNotes = profile.responseStyleNotes?.trim();
 
   // Only emit the block if at least one field is filled
-  if (!name && !oneLiner && !icp && !diff && !competitors && !industry && !stage && !extra) {
+  if (!name && !oneLiner && !icp && !diff && !competitors && !industry && !stage && !extra && !responseTone && !responseStyleNotes) {
     return "";
   }
 
@@ -61,6 +63,17 @@ export function formatWorkspaceIdentityBlock(profile: WorkspaceProfile | undefin
   if (diff)        lines.push(`Key differentiators: ${diff}`);
   if (competitors) lines.push(`Primary competitors: ${competitors}`);
   if (extra)       lines.push(`Additional context: ${extra}`);
+  if (responseTone || responseStyleNotes) {
+    const toneCopy =
+      responseTone === "concise"
+        ? "concise — short, direct answers; only expand when asked"
+        : responseTone === "detailed"
+          ? "detailed — thorough answers with full reasoning and structure"
+          : "balanced — clear structure without unnecessary length";
+    lines.push(
+      `Response style: ${responseTone ? toneCopy : ""}${responseTone && responseStyleNotes ? ". " : ""}${responseStyleNotes ?? ""} (Explicit style/length requests in a user message override this default; research depth stays the same — only the write-up changes.)`,
+    );
+  }
   lines.push("=== END WORKSPACE IDENTITY ===");
 
   return lines.join("\n");

@@ -107,6 +107,10 @@ export const workspaceProfileSchema = z.object({
   stage: z.enum(["idea", "pre-revenue", "early", "growth", "scale"]).optional(),
   /** Free-form overflow — anything that doesn't fit the named fields */
   additionalContext: z.string().max(2000).optional(),
+  /** Preferred answer length/depth for AI responses */
+  responseTone: z.enum(["concise", "balanced", "detailed"]).optional(),
+  /** Free-form style guidance (e.g. "bullet points, no fluff, cite sources inline") */
+  responseStyleNotes: z.string().max(500).optional(),
 });
 export type WorkspaceProfile = z.infer<typeof workspaceProfileSchema>;
 

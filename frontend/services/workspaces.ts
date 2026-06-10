@@ -9,6 +9,8 @@ export type WorkspaceProfile = {
   industry?: string;
   stage?: "idea" | "pre-revenue" | "early" | "growth" | "scale";
   additionalContext?: string;
+  responseTone?: "concise" | "balanced" | "detailed";
+  responseStyleNotes?: string;
 };
 
 export type WorkspaceListItem = {
