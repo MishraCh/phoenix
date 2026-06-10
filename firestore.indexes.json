@@ -1,6 +1,24 @@
 ﻿{
   "indexes": [
     {
+      "collectionGroup": "embeddings",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "vector",
+          "vectorConfig": {
+            "dimension": 1536,
+            "flat": {}
+          }
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
       "collectionGroup": "artifacts",
       "queryScope": "COLLECTION",
       "fields": [
