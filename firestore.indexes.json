@@ -1,6 +1,14 @@
 ﻿{
   "indexes": [
     {
+      "collectionGroup": "jobQueue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "embeddings",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
