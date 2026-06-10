@@ -859,7 +859,7 @@ function webDeepResearchTool(context: ToolExecutionContext) {
     {
       name: "web.deepResearch",
       description:
-        "Run deep, multi-source research on a topic and return a synthesized report (optionally structured). Use for thorough analysis beyond a quick search.",
+        "SLOW deep research (takes ~1 minute). Use ONLY when the user explicitly asks for deep/thorough/comprehensive research, and call it AT MOST ONCE per request. For ordinary research or comparison questions, use web.researchTask instead — it is fast and returns a grounded, cited answer.",
       schema: webDeepResearchInputSchema,
     },
   );

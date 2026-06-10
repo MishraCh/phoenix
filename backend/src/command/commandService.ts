@@ -188,6 +188,12 @@ export class CommandService {
     const executionBudget = executionRuntime.budget;
     if (input.mode === "search") executionRuntime.applyIntent("web_search");
     if (input.mode === "research") executionRuntime.applyIntent("deep_research");
+    // The multi-step agent loop needs far more headroom than single-pass profiles:
+    // tools (deep research, websets) poll external services and the model may fan
+    // out parallel tool calls. Streaming keeps the UI responsive meanwhile.
+    if (shouldUseToolLoop(input.mode, env.AGENTIC_TOOLLOOP_V1)) {
+      executionRuntime.applyIntent("agentic_loop");
+    }
     const usageEventService = new AiUsageEventService(this.db);
     try {
       result = await runWithAiExecutionContext(

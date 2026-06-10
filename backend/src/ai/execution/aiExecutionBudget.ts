@@ -18,7 +18,9 @@ const ROUTING_PROFILE = {
   maxLlmCalls: 2,
 };
 
-const PROFILES: Record<CommandIntent | "workflow_agent_step", AiBudgetProfile> = {
+export type BudgetProfileKey = CommandIntent | "workflow_agent_step" | "agentic_loop";
+
+const PROFILES: Record<BudgetProfileKey, AiBudgetProfile> = {
   normal_answer: { maxInputTokens: 16_000, maxGeneratedTokens: 8_000, maxLlmCalls: 2, defaultOutputTokens: 1_200, deadlineMs: 25_000 },
   integration_read: { maxInputTokens: 12_000, maxGeneratedTokens: 4_000, maxLlmCalls: 2, defaultOutputTokens: 1_200, deadlineMs: 15_000 },
   integration_write: { maxInputTokens: 12_000, maxGeneratedTokens: 4_000, maxLlmCalls: 2, defaultOutputTokens: 1_200, deadlineMs: 20_000 },
@@ -31,6 +33,10 @@ const PROFILES: Record<CommandIntent | "workflow_agent_step", AiBudgetProfile> =
   memory_query: { maxInputTokens: 16_000, maxGeneratedTokens: 6_000, maxLlmCalls: 2, defaultOutputTokens: 1_500, deadlineMs: 25_000 },
   clarification_needed: { maxInputTokens: 8_000, maxGeneratedTokens: 1_000, maxLlmCalls: 1, defaultOutputTokens: 400, deadlineMs: 10_000 },
   workflow_agent_step: { maxInputTokens: 24_000, maxGeneratedTokens: 8_000, maxLlmCalls: 2, defaultOutputTokens: 2_500, deadlineMs: 45_000 },
+  // Multi-step autonomous agent (ToolLoopAgent): tools like deep research poll
+  // external services for 60s+ and the model may fan out parallel tool calls,
+  // so this profile is intentionally generous. Streaming keeps the UI alive.
+  agentic_loop: { maxInputTokens: 96_000, maxGeneratedTokens: 24_000, maxLlmCalls: 10, defaultOutputTokens: 4_000, deadlineMs: 240_000 },
 };
 
 export class AiBudgetExceededError extends Error {
@@ -59,7 +65,7 @@ export class AiExecutionBudget {
     this.deadlineStartedAt = Date.now();
   }
 
-  applyIntent(intent: CommandIntent | "workflow_agent_step") {
+  applyIntent(intent: BudgetProfileKey) {
     this.profile = PROFILES[intent];
     this.deadlineStartedAt = Date.now();
   }
@@ -167,9 +173,7 @@ export type AiExecutionContext = {
   routeDecision?: RouteDecision;
   budget: AiExecutionBudget;
   signal: AbortSignal;
-  applyBudgetProfile?: (
-    intent: CommandIntent | "workflow_agent_step",
-  ) => void;
+  applyBudgetProfile?: (intent: BudgetProfileKey) => void;
   recordUsage: (usage: AiUsageObservation) => void;
 };
 
@@ -187,7 +191,7 @@ export class AiExecutionRuntime {
     return this.abortController.signal;
   }
 
-  applyIntent(intent: CommandIntent | "workflow_agent_step") {
+  applyIntent(intent: BudgetProfileKey) {
     this.budget.applyIntent(intent);
     this.scheduleDeadline();
   }
