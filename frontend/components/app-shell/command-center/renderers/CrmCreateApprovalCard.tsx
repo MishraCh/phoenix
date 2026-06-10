@@ -33,7 +33,8 @@ export function CrmCreateApprovalCard({
 }) {
   const status = approval.status ?? defaultStatus;
   const isExecuted = status === "executed";
-  const isExecuting = status === "executing";
+  // "approved" is the transient moment between approve and execution finishing.
+  const isExecuting = status === "executing" || status === "approved";
   const isFailed = status === "failed";
   const isPendingOrEdited = status === "pending" || status === "edited";
 

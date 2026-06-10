@@ -106,6 +106,12 @@ export async function approveApproval(request: Request, response: Response) {
       shouldResumeWorkflow = true;
     } else if (executionResult.status === "executing") {
       responsePayload = { approvalId, status: "executing" };
+    } else if (executionResult.status === "unsupported") {
+      responsePayload = {
+        approvalId,
+        status: "failed",
+        error: "This approval references an action Gideon can't execute. Ask Gideon to propose it again.",
+      };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Approved action execution failed.";
@@ -173,6 +179,12 @@ export async function retryApproval(request: Request, response: Response) {
       shouldResumeWorkflow = true;
     } else if (executionResult.status === "executing") {
       responsePayload = { approvalId, status: "executing" };
+    } else if (executionResult.status === "unsupported") {
+      responsePayload = {
+        approvalId,
+        status: "failed",
+        error: "This approval references an action Gideon can't execute. Ask Gideon to propose it again.",
+      };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Approved action execution failed.";

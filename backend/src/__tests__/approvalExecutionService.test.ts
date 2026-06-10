@@ -153,7 +153,7 @@ describe("ApprovalExecutionService", () => {
     expect(storedApproval?.["externalActionId"]).toBe("message_1");
   });
 
-  it("returns unsupported for approvals without a registered executable tool", async () => {
+  it("marks the approval failed (with a reason) when its tool is not registered — never a silent dead-end", async () => {
     const fake = new FakeFirestore();
     const approval = seedApproval(fake, {
       proposedAction: {
@@ -173,7 +173,8 @@ describe("ApprovalExecutionService", () => {
 
     expect(result.status).toBe("unsupported");
     const storedApproval = fake.read("workspaces/ws_test/approvals/approval_1");
-    expect(storedApproval?.["status"]).toBe("approved");
+    expect(storedApproval?.["status"]).toBe("failed");
+    expect(String(storedApproval?.["error"])).toContain("unknown.tool");
   });
 
   it("executes approved HubSpot updates and marks the approval executed", async () => {

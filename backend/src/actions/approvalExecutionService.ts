@@ -43,6 +43,15 @@ export class ApprovalExecutionService {
     const toolDefinition = getToolDefinition(approval.proposedAction.toolName);
 
     if (!toolDefinition) {
+      // Leaving the approval silently in "approved" dead-ends the UI (no card
+      // state for it) — fail it loudly with a reason the user can act on.
+      const reason = `This approval references "${approval.proposedAction.toolName}", which is not an executable action. Ask Gideon to propose the action again.`;
+      logger.error("Approved action references unknown tool", {
+        approvalId: approval.id,
+        toolName: approval.proposedAction.toolName,
+        actionType: approval.proposedAction.actionType,
+      });
+      await this.approvalService.markFailed(currentWorkspace.workspace, approval.id, reason, userId);
       return { status: "unsupported" };
     }
 

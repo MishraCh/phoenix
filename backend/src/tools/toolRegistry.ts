@@ -368,9 +368,40 @@ function artifactTool(context: ToolExecutionContext) {
   );
 }
 
+const RISK_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
 function approvalTool(context: ToolExecutionContext) {
   return tool(
     async (input) => {
+      // The model chooses toolName/input freely here. An approval wrapping a
+      // toolName that isn't a real, approval-gated executor can never run when
+      // approved (the execute path dead-ends), so validate at creation time and
+      // return an actionable error the model can self-correct from in-loop.
+      const target = getToolDefinition(input.toolName);
+      if (!target || !target.requiresApproval) {
+        return {
+          status: "error",
+          approvalId: "",
+          message: `"${input.toolName}" is not an executable approval target. Use a typed prepare*Approval tool instead (e.g. hubspot.prepareCreateApproval, hubspot.prepareUpdateApproval, gmail.prepareSendApproval, stripe.preparePaymentLinkApproval) — they validate the payload and create the approval for you.`,
+        };
+      }
+      const parsed = target.inputSchema.safeParse(input.input);
+      if (!parsed.success) {
+        const issues = parsed.error.issues
+          .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+          .join("; ");
+        return {
+          status: "error",
+          approvalId: "",
+          message: `input does not match the ${input.toolName} schema — ${issues}. Fix the payload or use the matching prepare*Approval tool.`,
+        };
+      }
+      // External writes are never lower-risk than their executor says they are.
+      const riskLevel =
+        (RISK_ORDER[target.riskLevel] ?? 0) > (RISK_ORDER[input.riskLevel] ?? 0)
+          ? target.riskLevel
+          : input.riskLevel;
+
       const service = new ApprovalService(context.db);
       const approval = await service.createApproval({
         workspace: context.currentWorkspace.workspace,
@@ -379,15 +410,15 @@ function approvalTool(context: ToolExecutionContext) {
         reason: input.reason,
         type: input.type,
         preview: input.preview,
-        riskLevel: input.riskLevel,
+        riskLevel,
         sourceRefs: context.sourceRefs ?? [],
         idempotencyKey: ensureIdempotencyKey(input),
         proposedAction: {
           toolName: input.toolName,
           actionType: input.actionType,
-          input: input.input,
+          input: parsed.data as Record<string, unknown>,
           requiresApproval: true,
-          riskLevel: input.riskLevel,
+          riskLevel,
         },
       });
 
@@ -399,7 +430,8 @@ function approvalTool(context: ToolExecutionContext) {
     },
     {
       name: "approval.create",
-      description: "Create an approval record for a risky or external write action.",
+      description:
+        "Create an approval record wrapping an approval-gated executor tool. toolName must be a real executor (e.g. hubspot.createApproved) and input must match its schema. Prefer the typed prepare*Approval tools — they do this for you.",
       schema: approvalCreateInputSchema,
     },
   );
