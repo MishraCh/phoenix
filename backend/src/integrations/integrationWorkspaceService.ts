@@ -1516,7 +1516,9 @@ export class IntegrationWorkspaceService {
     const approval = await this.approvalService.createApproval({
       workspace: currentWorkspace.workspace,
       userId,
-      title: input.title ?? `Update HubSpot ${input.module} record`,
+      // Always title from the RESOLVED record name — model-supplied titles have
+      // invented names (e.g. "John Doe") for records the model never saw.
+      title: `Update ${recordContext.recordTitle}`,
       reason: "This HubSpot change requires approval before Gideon writes to CRM.",
       type: "crm_update",
       preview: {
@@ -1642,10 +1644,15 @@ export class IntegrationWorkspaceService {
       });
     }
 
+    // Title from the actual properties being created (never a model-invented name).
+    const newRecordLabel =
+      hubspotRecordTitle(input.module, input.properties as Record<string, string | null | undefined>) ||
+      `new ${input.module.slice(0, -1)}`;
+
     const approval = await this.approvalService.createApproval({
       workspace: currentWorkspace.workspace,
       userId,
-      title: input.title ?? `Create new HubSpot ${input.module} record`,
+      title: `Create HubSpot ${input.module.slice(0, -1)}: ${newRecordLabel}`,
       reason: "Creating a new HubSpot CRM record requires approval.",
       type: "crm_create",
       preview: {
@@ -1879,7 +1886,7 @@ export class IntegrationWorkspaceService {
     const approval = await this.approvalService.createApproval({
       workspace: currentWorkspace.workspace,
       userId,
-      title: input.title ?? `Add note to HubSpot ${input.module.slice(0, -1)}`,
+      title: `Add note to ${recordContext.recordTitle}`,
       reason: "This HubSpot note will be written externally after approval.",
       type: "crm_create",
       preview: {
@@ -1976,7 +1983,7 @@ export class IntegrationWorkspaceService {
     const approval = await this.approvalService.createApproval({
       workspace: currentWorkspace.workspace,
       userId,
-      title: input.title ?? `Create follow-up task for ${input.module.slice(0, -1)}`,
+      title: `Create follow-up task for ${recordContext.recordTitle}`,
       reason: "This HubSpot task will be created externally after approval.",
       type: "task_create",
       preview: {
@@ -2086,7 +2093,7 @@ export class IntegrationWorkspaceService {
     const approval = await this.approvalService.createApproval({
       workspace: currentWorkspace.workspace,
       userId,
-      title: input.title ?? "Update HubSpot task",
+      title: `Update task: ${recordTitle}`,
       reason: "This HubSpot task change requires approval before Gideon writes to CRM.",
       type: "task_create",
       preview: {
