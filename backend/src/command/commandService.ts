@@ -226,9 +226,9 @@ export class CommandService {
             requestEnvelope: envelope,
           };
           return shouldUseToolLoop(input.mode, env.AGENTIC_TOOLLOOP_V1)
-            ? (new ToolLoopAgentService(this.db).run(runArgs) as ReturnType<
-                CommandGraphService["run"]
-              >)
+            ? (new ToolLoopAgentService(this.db).runStream(runArgs, (token) =>
+                progressEmit("command.token", { token }),
+              ) as ReturnType<CommandGraphService["run"]>)
             : new CommandGraphService(this.db).run(runArgs);
         },
       );

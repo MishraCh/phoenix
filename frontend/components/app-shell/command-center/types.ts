@@ -14,6 +14,8 @@ export type SessionMessage = {
   status: "running" | "completed" | "error";
   response: CommandResponse | null;
   statusCopy: string;
+  /** Live answer tokens streamed over SSE while status === "running". */
+  streamingText?: string;
   starred: boolean;
   savedItemId: string | null;
 };

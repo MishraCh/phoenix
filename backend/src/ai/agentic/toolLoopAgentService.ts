@@ -41,6 +41,46 @@ type ToolResultOutput = {
 };
 type LoopStep = { toolResults?: Array<{ toolName?: string; output?: unknown }> };
 
+type CollectorState = {
+  sourceRefs: SourceRef[];
+  proposedActions: Array<Record<string, unknown>>;
+  createdApproval: Record<string, unknown> | null;
+  createdArtifact: Record<string, unknown> | null;
+  createdWorkflow: Record<string, unknown> | null;
+};
+
+/** Accumulates sources + created entities from the agent's tool steps (result parity). */
+function createCollector() {
+  const state: CollectorState = {
+    sourceRefs: [],
+    proposedActions: [],
+    createdApproval: null,
+    createdArtifact: null,
+    createdWorkflow: null,
+  };
+  const collectSteps = (steps: LoopStep[] | undefined) => {
+    for (const step of steps ?? []) {
+      for (const tr of step.toolResults ?? []) {
+        const out = tr.output as ToolResultOutput | undefined;
+        if (!out) continue;
+        if (out.sourceRefs?.length) state.sourceRefs.push(...out.sourceRefs);
+        if (out.approvalId) {
+          state.createdApproval = out;
+          state.proposedActions.push({
+            id: out.approvalId,
+            label: out.label ?? "Proposed action",
+            riskLevel: out.riskLevel ?? "medium",
+            requiresApproval: out.requiresApproval ?? true,
+          });
+        }
+        if (out.artifactId) state.createdArtifact = out;
+        if (out.workflowId) state.createdWorkflow = out;
+      }
+    }
+  };
+  return { state, collectSteps };
+}
+
 /**
  * Multi-step autonomous agent (Vercel AI SDK ToolLoopAgent) used for `auto`/`research`
  * commands when AGENTIC_TOOLLOOP_V1 is enabled. Returns the same response shape as
@@ -49,7 +89,8 @@ type LoopStep = { toolResults?: Array<{ toolName?: string; output?: unknown }> }
 export class ToolLoopAgentService {
   constructor(private readonly db: Firestore) {}
 
-  async run(input: AgentRunInput): Promise<Record<string, unknown>> {
+  /** Build the agent + working-memory messages shared by run() and runStream(). */
+  private async prepare(input: AgentRunInput) {
     const agentRunId = `run_${randomUUID()}`;
     const execution = getAiExecutionContext();
     const maxSteps = Math.max(2, execution?.budget.remaining().llmCalls ?? 6);
@@ -58,129 +99,126 @@ export class ToolLoopAgentService {
       db: this.db,
       currentWorkspace: input.currentWorkspace,
       userId: input.userId,
-      contextPacket: {
-        sessionContext: input.sessionContext,
-      } as Record<string, unknown>,
+      contextPacket: { sessionContext: input.sessionContext } as Record<string, unknown>,
     } as Parameters<typeof adaptToolForAgent>[1];
 
     const registry = new ToolRegistryService(this.db);
     const defs = await registry.listTools(input.currentWorkspace, input.agentAllowedTools ?? undefined);
     const available = defs.filter((d) => d.available);
 
-    // The Vercel AI SDK / model tool-name schema only allows [a-zA-Z0-9_-], so
-    // dotted registry names (e.g. "web.researchTask") must be sanitized. The
-    // execute closure is bound per-tool, so the key is just the model-facing name.
+    // Model tool-name schema only allows [a-zA-Z0-9_-]; dotted registry names are sanitized.
     const tools: Record<string, ReturnType<typeof adaptToolForAgent>> = {};
     for (const def of available) {
       tools[sanitizeToolName(def.name)] = adaptToolForAgent(def, context);
     }
 
-    // Accumulate sources + created entities from the tool loop (result parity).
-    const sourceRefs: SourceRef[] = [];
-    const proposedActions: Array<Record<string, unknown>> = [];
-    let createdApproval: Record<string, unknown> | null = null;
-    let createdArtifact: Record<string, unknown> | null = null;
-    let createdWorkflow: Record<string, unknown> | null = null;
-
-    const collectFromStep = (step: LoopStep) => {
-      for (const tr of step.toolResults ?? []) {
-        const out = tr.output as ToolResultOutput | undefined;
-        if (!out) continue;
-        if (out.sourceRefs?.length) sourceRefs.push(...out.sourceRefs);
-        if (out.approvalId) {
-          createdApproval = out;
-          proposedActions.push({
-            id: out.approvalId,
-            label: out.label ?? "Proposed action",
-            riskLevel: out.riskLevel ?? "medium",
-            requiresApproval: out.requiresApproval ?? true,
-          });
-        }
-        if (out.artifactId) createdArtifact = out;
-        if (out.workflowId) createdWorkflow = out;
-      }
-    };
-
-    // Tier-1 working memory: prior turns + the new user turn.
-    const messages = [
-      ...(input.messages ?? []),
-      { role: "user" as const, content: input.input },
-    ];
-
-    // Tier-3 long-term memory: retrieve relevant workspace facts/prior work.
+    // Tier-1 working memory + the new user turn.
+    const messages = [...(input.messages ?? []), { role: "user" as const, content: input.input }];
+    // Tier-3 long-term memory: relevant workspace facts/prior work.
     const memoryBlock = await buildAgentMemoryBlock(this.db, input.currentWorkspace.id, input.input);
 
-    try {
-      const agent = new ToolLoopAgent({
-        model: env.GATEWAY_DEFAULT_MODEL,
-        instructions: buildToolLoopInstructions(input, memoryBlock),
-        tools,
-        stopWhen: stepCountIs(maxSteps),
-        onStepFinish: collectFromStep,
-      });
+    const agent = new ToolLoopAgent({
+      model: env.GATEWAY_DEFAULT_MODEL,
+      instructions: buildToolLoopInstructions(input, memoryBlock),
+      tools,
+      stopWhen: stepCountIs(maxSteps),
+    });
 
+    return { agentRunId, execution, agent, messages };
+  }
+
+  /** Non-streaming run (used by tests + non-streaming callers). */
+  async run(input: AgentRunInput): Promise<Record<string, unknown>> {
+    const { agentRunId, execution, agent, messages } = await this.prepare(input);
+    const { state, collectSteps } = createCollector();
+    try {
       const { text, steps } = await agent.generate({
         messages,
         ...(execution ? { abortSignal: execution.signal } : {}),
       });
-      for (const step of (steps ?? []) as LoopStep[]) collectFromStep(step);
-
+      collectSteps(steps as LoopStep[] | undefined);
       logger.info("ToolLoopAgent run completed", {
         agentRunId,
         steps: steps?.length ?? 0,
-        sources: sourceRefs.length,
-        proposedActions: proposedActions.length,
+        sources: state.sourceRefs.length,
+        proposedActions: state.proposedActions.length,
       });
-
-      return this.buildResponse(agentRunId, input, {
-        answer: text || "I couldn't complete that request.",
-        sourceRefs: dedupeSources(sourceRefs),
-        proposedActions,
-        createdApproval,
-        createdArtifact,
-        createdWorkflow,
-      });
+      return this.buildResponse(agentRunId, input, state, text || "I couldn't complete that request.");
     } catch (error) {
       logger.warn("ToolLoopAgent run failed", {
         agentRunId,
         error: error instanceof Error ? error.message : String(error),
       });
-      return this.buildResponse(agentRunId, input, {
-        answer: "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
-        sourceRefs: dedupeSources(sourceRefs),
-        proposedActions,
-        createdApproval,
-        createdArtifact,
-        createdWorkflow,
+      return this.buildResponse(
+        agentRunId,
+        input,
+        state,
+        "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
+      );
+    }
+  }
+
+  /** Streaming run: emits answer-token deltas via onToken; returns the same response shape. */
+  async runStream(
+    input: AgentRunInput,
+    onToken: (delta: string) => void,
+  ): Promise<Record<string, unknown>> {
+    const { agentRunId, execution, agent, messages } = await this.prepare(input);
+    const { state, collectSteps } = createCollector();
+    try {
+      const result = await agent.stream({
+        messages,
+        ...(execution ? { abortSignal: execution.signal } : {}),
       });
+
+      let streamed = "";
+      for await (const delta of result.textStream) {
+        streamed += delta;
+        onToken(delta);
+      }
+
+      collectSteps((await result.steps) as LoopStep[] | undefined);
+      const finalText = (await result.text) || streamed || "I couldn't complete that request.";
+      logger.info("ToolLoopAgent stream completed", {
+        agentRunId,
+        sources: state.sourceRefs.length,
+        proposedActions: state.proposedActions.length,
+      });
+      return this.buildResponse(agentRunId, input, state, finalText);
+    } catch (error) {
+      logger.warn("ToolLoopAgent stream failed", {
+        agentRunId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.buildResponse(
+        agentRunId,
+        input,
+        state,
+        "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
+      );
     }
   }
 
   private buildResponse(
     agentRunId: string,
     input: AgentRunInput,
-    parts: {
-      answer: string;
-      sourceRefs: SourceRef[];
-      proposedActions: Array<Record<string, unknown>>;
-      createdApproval: Record<string, unknown> | null;
-      createdArtifact: Record<string, unknown> | null;
-      createdWorkflow: Record<string, unknown> | null;
-    },
+    state: CollectorState,
+    answer: string,
   ): Record<string, unknown> {
+    const sourceRefs = dedupeSources(state.sourceRefs);
     return {
-      answer: parts.answer,
+      answer,
       agentRunId,
       resolvedMode: input.mode ?? "auto",
       resultType: "answer",
       result: null,
-      proposedActions: parts.proposedActions,
+      proposedActions: state.proposedActions,
       artifactDrafts: [],
-      createdArtifact: parts.createdArtifact,
-      createdApproval: parts.createdApproval,
-      createdWorkflow: parts.createdWorkflow,
-      sources: parts.sourceRefs.map((s) => ({ ...s })),
-      sourceRefs: parts.sourceRefs,
+      createdArtifact: state.createdArtifact,
+      createdApproval: state.createdApproval,
+      createdWorkflow: state.createdWorkflow,
+      sources: sourceRefs.map((s) => ({ ...s })),
+      sourceRefs,
       missingContext: [],
       creditsCharged: 0,
       routeDecision: null,

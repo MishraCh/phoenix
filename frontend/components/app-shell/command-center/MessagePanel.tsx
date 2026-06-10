@@ -138,11 +138,18 @@ export function MessagePanel({
                   {message.statusCopy}
                 </p>
               ) : null}
-              <div className="space-y-2.5">
-                <div className="h-2.5 w-3/4 animate-pulse rounded-full bg-primary/10" />
-                <div className="h-2.5 w-full animate-pulse rounded-full bg-primary/7" style={{ animationDelay: "120ms" }} />
-                <div className="h-2.5 w-5/6 animate-pulse rounded-full bg-primary/6" style={{ animationDelay: "240ms" }} />
-              </div>
+              {message.streamingText ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                  {message.streamingText}
+                  <span className="ml-0.5 inline-block h-4 w-[2px] -translate-y-[1px] animate-pulse bg-primary align-middle" />
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="h-2.5 w-3/4 animate-pulse rounded-full bg-primary/10" />
+                  <div className="h-2.5 w-full animate-pulse rounded-full bg-primary/7" style={{ animationDelay: "120ms" }} />
+                  <div className="h-2.5 w-5/6 animate-pulse rounded-full bg-primary/6" style={{ animationDelay: "240ms" }} />
+                </div>
+              )}
             </div>
           ) : message.status === "error" ? (
             <div className="flex items-start gap-3 rounded-xl border border-destructive/15 bg-destructive/4 px-4 py-3">

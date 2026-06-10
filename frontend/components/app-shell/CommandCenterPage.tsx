@@ -53,6 +53,7 @@ const COMMAND_PROGRESS_EVENTS = [
   "command.tool_completed",
   "command.planning",
   "command.synthesizing",
+  "command.token",
 ];
 
 const SSE_STATUS_COPY: Record<string, string> = {
@@ -168,7 +169,19 @@ export function CommandCenterPage() {
 
   useWorkspaceStream(
     COMMAND_PROGRESS_EVENTS,
-    useCallback((event: string) => {
+    useCallback((event: string, data: unknown) => {
+      if (event === "command.token") {
+        const token = (data as { token?: string } | null)?.token ?? "";
+        if (!token) return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.status === "running"
+              ? { ...m, streamingText: (m.streamingText ?? "") + token, statusCopy: "Writing response…" }
+              : m,
+          ),
+        );
+        return;
+      }
       setMessages((prev) =>
         prev.map((m) =>
           m.status === "running" ? { ...m, statusCopy: SSE_STATUS_COPY[event] ?? m.statusCopy } : m,

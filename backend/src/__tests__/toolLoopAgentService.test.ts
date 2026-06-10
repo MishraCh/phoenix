@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 
 const generateMock = vi.fn();
+const streamMock = vi.fn();
 const capturedAgentConfig: { value?: any } = {};
 vi.mock("ai", () => ({
   ToolLoopAgent: class {
@@ -9,6 +10,7 @@ vi.mock("ai", () => ({
       capturedAgentConfig.value = cfg;
     }
     generate = generateMock;
+    stream = streamMock;
   },
   tool: (cfg: any) => cfg,
   stepCountIs: (n: number) => ({ stepCountIs: n }),
@@ -146,6 +148,35 @@ describe("ToolLoopAgentService", () => {
     expect(result.createdApproval?.approvalId).toBe("ap_1");
     expect(result.proposedActions).toHaveLength(1);
     expect(result.proposedActions[0].id).toBe("ap_1");
+  });
+
+  it("runStream emits token deltas and returns the same response shape (with sources)", async () => {
+    const tokens = ["Acme ", "is ", "a SaaS company."];
+    streamMock.mockResolvedValue({
+      textStream: (async function* () {
+        for (const t of tokens) yield t;
+      })(),
+      text: Promise.resolve("Acme is a SaaS company."),
+      steps: Promise.resolve([
+        {
+          toolResults: [
+            {
+              toolName: "web_researchTask",
+              output: { sourceRefs: [{ sourceType: "web", sourceId: "s1", url: "https://acme.com", provider: "exa_search" }] },
+            },
+          ],
+        },
+      ]),
+    });
+
+    const received: string[] = [];
+    const result = (await new ToolLoopAgentService({} as any).runStream(baseInput, (d) => received.push(d))) as any;
+
+    expect(received).toEqual(tokens);
+    expect(result.answer).toBe("Acme is a SaaS company.");
+    expect(result.resultType).toBe("answer");
+    expect(result.sourceRefs).toHaveLength(1);
+    expect(result.sourceRefs[0].url).toBe("https://acme.com");
   });
 });
 

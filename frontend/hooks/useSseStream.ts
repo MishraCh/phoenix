@@ -8,6 +8,7 @@ const NAMED_EVENTS = [
   "command.tool_completed",
   "command.planning",
   "command.synthesizing",
+  "command.token",
   "command.completed",
   "command.failed",
   "workflow.run.started",
