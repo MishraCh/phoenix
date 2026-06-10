@@ -379,10 +379,12 @@ function approvalTool(context: ToolExecutionContext) {
       // return an actionable error the model can self-correct from in-loop.
       const target = getToolDefinition(input.toolName);
       if (!target || !target.requiresApproval) {
+        // Tool names exposed to the agent loop are underscore-sanitized, so
+        // suggest those exact names — the model checks its toolkit literally.
         return {
           status: "error",
           approvalId: "",
-          message: `"${input.toolName}" is not an executable approval target. Use a typed prepare*Approval tool instead (e.g. hubspot.prepareCreateApproval, hubspot.prepareUpdateApproval, gmail.prepareSendApproval, stripe.preparePaymentLinkApproval) — they validate the payload and create the approval for you.`,
+          message: `"${input.toolName}" is not an executable approval target. Call the provider's typed prepare-approval tool from your toolkit instead — hubspot_prepareCreateApproval (create CRM record), hubspot_prepareUpdateApproval (update CRM record), gmail_prepareSendApproval (send email), stripe_preparePaymentLinkApproval (payment link). It validates the payload and creates the approval for you. Do not give up — call that tool now.`,
         };
       }
       const parsed = target.inputSchema.safeParse(input.input);

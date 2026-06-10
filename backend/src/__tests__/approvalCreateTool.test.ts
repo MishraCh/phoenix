@@ -42,7 +42,9 @@ describe("approval.create generic tool (model-chosen target validation)", () => 
 
     expect(result.status).toBe("error");
     expect(result.approvalId).toBe("");
-    expect(result.message).toContain("prepare*Approval");
+    // Suggestions must use the underscore-sanitized names the agent loop
+    // actually exposes — the model checks its toolkit for the literal name.
+    expect(result.message).toContain("hubspot_prepareCreateApproval");
   });
 
   it("rejects a real but non-approval-gated tool as target", async () => {
