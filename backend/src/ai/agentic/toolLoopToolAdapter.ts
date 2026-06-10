@@ -41,7 +41,12 @@ export function adaptToolForAgent(toolDef: ToolDefinition, context: ToolExecutio
       if (decision.status === "blocked") {
         return { status: "blocked", reason: decision.reason };
       }
-      if (decision.status === "approval_required" || decision.requiresApproval) {
+      // Only tools that EXECUTE an external write (requiresApproval: true — the
+      // *Approved executors) are stopped here. prepare*Approval tools are the
+      // approval mechanism itself: policy saying "approval required" for a
+      // high-risk ACTION is exactly why the prepare tool must run — it creates
+      // the approval draft a human then reviews.
+      if (toolDef.requiresApproval && (decision.status === "approval_required" || decision.requiresApproval)) {
         return {
           status: "approval_required",
           reason: decision.reason,

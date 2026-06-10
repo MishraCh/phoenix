@@ -194,7 +194,10 @@ export function MessagePanel({
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-              {createdApproval && !createdApproval.actionType?.startsWith("hubspot_") ? (
+              {/* hubspot_/stripe_ approvals render their rich cards inside CommandResponseBody */}
+              {createdApproval &&
+              !createdApproval.actionType?.startsWith("hubspot_") &&
+              !createdApproval.actionType?.startsWith("stripe_") ? (
                 <LiveApprovalCard
                   approvalId={createdApproval.approvalId}
                   messageId={message.id}

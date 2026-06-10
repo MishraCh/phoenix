@@ -37,6 +37,10 @@ export function ApprovalEditorModal({ approvalId, onClose, onSaved }: ApprovalEd
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [to, setTo] = useState("");
+  // Generic CRM field editor: edits input.properties / input.updates (or flat
+  // primitive input fields) for hubspot_create, hubspot_update, notes, tasks…
+  const [crmFields, setCrmFields] = useState<Array<{ key: string; value: string }>>([]);
+  const [crmContainer, setCrmContainer] = useState<string | null>(null);
 
   useEffect(() => {
     if (!approvalId || !user) {
@@ -67,6 +71,19 @@ export function ApprovalEditorModal({ approvalId, onClose, onSaved }: ApprovalEd
                setSubject(input.subject || "");
                setBody(input.body || "");
                setTo(Array.isArray(input.to) ? input.to.join(", ") : (input.to || ""));
+            } else {
+               const input = (data.proposedAction?.input as Record<string, any>) || {};
+               const containerKey = ["properties", "updates"].find(
+                 (k) => input[k] && typeof input[k] === "object" && !Array.isArray(input[k]),
+               );
+               const source: Record<string, any> = containerKey ? input[containerKey] : input;
+               const editable = Object.entries(source).filter(
+                 ([k, v]) =>
+                   (typeof v === "string" || typeof v === "number" || typeof v === "boolean") &&
+                   !["module", "recordId", "objectType", "actionType"].includes(k),
+               );
+               setCrmContainer(containerKey ?? null);
+               setCrmFields(editable.map(([k, v]) => ({ key: k, value: String(v) })));
             }
             setLoading(false);
           }
@@ -110,10 +127,26 @@ export function ApprovalEditorModal({ approvalId, onClose, onSaved }: ApprovalEd
         patch.proposedAction.input.subject = subject;
         patch.proposedAction.input.body = body;
         patch.proposedAction.input.to = toArray;
-        
+
         patch.preview.subject = subject;
         patch.preview.body = body;
         patch.preview.to = toArray;
+      } else if (crmFields.length) {
+        const edited = Object.fromEntries(crmFields.map((f) => [f.key, f.value]));
+        if (crmContainer) {
+          patch.proposedAction.input[crmContainer] = {
+            ...(approval.proposedAction?.input?.[crmContainer] ?? {}),
+            ...edited,
+          };
+          if (patch.preview[crmContainer] && typeof patch.preview[crmContainer] === "object") {
+            patch.preview[crmContainer] = { ...patch.preview[crmContainer], ...edited };
+          }
+        } else {
+          Object.assign(patch.proposedAction.input, edited);
+          for (const f of crmFields) {
+            if (f.key in patch.preview) patch.preview[f.key] = f.value;
+          }
+        }
       }
 
       await editApproval(token, approvalId, patch);
@@ -180,16 +213,32 @@ export function ApprovalEditorModal({ approvalId, onClose, onSaved }: ApprovalEd
                 />
               </div>
             </div>
+          ) : crmFields.length ? (
+            <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
+              {crmFields.map((field, idx) => (
+                <div key={field.key} className="space-y-1.5">
+                  <label className="text-sm font-semibold text-foreground capitalize">{field.key.replace(/_/g, " ")}</label>
+                  <input
+                    type="text"
+                    value={field.value}
+                    onChange={(e) =>
+                      setCrmFields((prev) => prev.map((f, i) => (i === idx ? { ...f, value: e.target.value } : f)))
+                    }
+                    className="w-full rounded-xl border border-border/50 bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="rounded-xl border border-border bg-secondary/30 p-4">
-              <p className="text-sm text-muted-foreground">Editing is currently optimized for emails. Other tool types may not be fully editable here yet.</p>
+              <p className="text-sm text-muted-foreground">This action has no editable fields. You can approve it as-is or reject it.</p>
             </div>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSave} disabled={loading || saving || !approval}>
+          <Button onClick={handleSave} disabled={loading || saving || !approval || (!isEmail && crmFields.length === 0)}>
             {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
             Save changes
           </Button>

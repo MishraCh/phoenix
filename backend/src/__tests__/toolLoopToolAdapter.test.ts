@@ -53,7 +53,7 @@ describe("toolLoopToolAdapter", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("does NOT invoke and returns approval_required when policy requires approval", async () => {
+  it("does NOT invoke write-EXECUTING tools (requiresApproval: true) when policy requires approval", async () => {
     evaluateActionMock.mockReturnValue({ status: "approval_required", requiresApproval: true, reason: "needs approval" });
     const { def, invoke } = makeToolDef({ name: "hubspot.updateApproved", riskLevel: "high", requiresApproval: true });
     const aiTool = adaptToolForAgent(def, ctx);
@@ -61,6 +61,18 @@ describe("toolLoopToolAdapter", () => {
     const result = (await exec({ prompt: "x" })) as { status: string };
     expect(invoke).not.toHaveBeenCalled();
     expect(result.status).toBe("approval_required");
+  });
+
+  it("DOES invoke high-risk prepare*Approval tools — they ARE the approval mechanism", async () => {
+    // Policy marks high-risk actions approval_required, but the prepare tool only
+    // creates the approval draft (requiresApproval: false) — it must run.
+    evaluateActionMock.mockReturnValue({ status: "approval_required", requiresApproval: true, reason: "high risk action" });
+    const { def, invoke } = makeToolDef({ name: "hubspot.prepareCreateApproval", riskLevel: "high", requiresApproval: false });
+    const aiTool = adaptToolForAgent(def, ctx);
+    const exec = aiTool.execute as (i: unknown) => Promise<unknown>;
+    const result = await exec({ prompt: "x" });
+    expect(invoke).toHaveBeenCalledWith({ prompt: "x" });
+    expect(result).toEqual({ ok: true });
   });
 
   it("does NOT invoke and returns blocked when policy blocks", async () => {

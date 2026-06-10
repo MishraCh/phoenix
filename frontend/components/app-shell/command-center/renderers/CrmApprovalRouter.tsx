@@ -6,6 +6,7 @@ import { CrmTaskApprovalCard } from "./CrmTaskApprovalCard";
 import { CrmNoteApprovalCard } from "./CrmNoteApprovalCard";
 import { CrmUpdateApprovalCard } from "./CrmUpdateApprovalCard";
 import { CrmBulkApprovalCard } from "./CrmBulkApprovalCard";
+import { CrmCreateApprovalCard } from "./CrmCreateApprovalCard";
 import { PaymentLinkApprovalCard } from "./PaymentLinkApprovalCard";
 
 export function CrmApprovalRouter({
@@ -58,5 +59,19 @@ export function CrmApprovalRouter({
     return <PaymentLinkApprovalCard approval={approval} messageId={messageId} defaultStatus={defaultStatus} onEdit={onEdit} onApprove={onApprove} />;
   }
 
-  return <div>Unknown CRM approval action type: {String(actionType)}</div>;
+  if (actionType === "hubspot_create") {
+    return <CrmCreateApprovalCard approval={approval} messageId={messageId} defaultStatus={defaultStatus} onEdit={onEdit} onApprove={onApprove} />;
+  }
+
+  // Any approval type without a dedicated card still gets Approve/Edit in chat.
+  return (
+    <CrmCreateApprovalCard
+      approval={approval}
+      messageId={messageId}
+      defaultStatus={defaultStatus}
+      onEdit={onEdit}
+      onApprove={onApprove}
+      headline="Approval required"
+    />
+  );
 }
