@@ -12,6 +12,7 @@ import {
   getIntegrationDetail,
   getIntegrationItemDetail,
   getIntegrationWorkspace,
+  getStripeOverview,
   gmailPubSubWebhook,
   hubspotWebhook,
   integrationCallback,
@@ -68,6 +69,7 @@ integrationsRouter.post(
   validateRequest({ body: z.object({ apiKey: z.string().trim().min(12).max(200) }) }),
   connectStripeWithKey,
 );
+integrationsRouter.get("/integrations/stripe/overview", authMiddleware, getStripeOverview);
 integrationsRouter.get(
   "/integrations/:provider/callback",
   validateRequest({ params: providerParamsSchema }),

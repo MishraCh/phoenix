@@ -91,6 +91,17 @@ export async function connectStripeWithKey(request: Request, response: Response)
   response.json(result);
 }
 
+export async function getStripeOverview(request: Request, response: Response) {
+  const user = requireUser(request);
+  const currentWorkspace = await resolveCurrentWorkspace(user, request);
+  const { StripeIntegrationService } = await import(
+    "../integrations/providers/stripe/stripeIntegrationService.js"
+  );
+  const overview = await new StripeIntegrationService(getFirebaseDb()).getOverview(currentWorkspace.id);
+
+  response.json(overview);
+}
+
 export async function integrationCallback(request: Request, response: Response) {
   const service = new IntegrationService(getFirebaseDb());
   const redirectUrl = await service.handleOAuthCallback(getProvider(request), {
