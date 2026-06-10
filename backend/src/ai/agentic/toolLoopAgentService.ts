@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
-import { ToolLoopAgent, stepCountIs } from "ai";
+import { ToolLoopAgent, generateText, stepCountIs } from "ai";
 
 import { env } from "../../config/env.js";
 import { logger } from "../../observability/logger.js";
@@ -40,7 +40,12 @@ type ToolResultOutput = {
   requiresApproval?: boolean;
   actionType?: string;
 };
-type LoopStep = { toolResults?: Array<{ toolName?: string; output?: unknown }> };
+type LoopStep = {
+  toolResults?: Array<{ toolName?: string; output?: unknown }>;
+  toolCalls?: Array<{ toolName?: string; input?: unknown }>;
+  content?: Array<{ type?: string; toolName?: string; input?: unknown; output?: unknown; error?: unknown }>;
+  text?: string;
+};
 
 /** Map the (sanitized) prepare-approval tool name → the approval's real actionType,
  *  so the frontend routes the agent-path approval to the right card. */
@@ -155,13 +160,17 @@ export class ToolLoopAgentService {
         ...(execution ? { abortSignal: execution.signal } : {}),
       });
       collectSteps(steps as LoopStep[] | undefined);
+      const finalText =
+        text || (await this.recoverAnswerFromSteps(input, steps as LoopStep[] | undefined));
       logger.info("ToolLoopAgent run completed", {
         agentRunId,
         steps: steps?.length ?? 0,
+        tools: toolNamesFromSteps(steps as LoopStep[] | undefined),
         sources: state.sourceRefs.length,
         proposedActions: state.proposedActions.length,
+        recovered: !text && !!finalText,
       });
-      return this.buildResponse(agentRunId, input, state, text || "I couldn't complete that request.");
+      return this.buildResponse(agentRunId, input, state, finalText || "I couldn't complete that request.");
     } catch (error) {
       logger.warn("ToolLoopAgent run failed", {
         agentRunId,
@@ -195,14 +204,26 @@ export class ToolLoopAgentService {
         onToken(delta);
       }
 
-      collectSteps((await result.steps) as LoopStep[] | undefined);
-      const finalText = (await result.text) || streamed || "I couldn't complete that request.";
+      const steps = (await result.steps) as LoopStep[] | undefined;
+      collectSteps(steps);
+      let finalText = (await result.text) || streamed;
+      let recovered = false;
+      if (!finalText.trim()) {
+        const recovery = await this.recoverAnswerFromSteps(input, steps, onToken);
+        if (recovery) {
+          finalText = recovery;
+          recovered = true;
+        }
+      }
       logger.info("ToolLoopAgent stream completed", {
         agentRunId,
+        steps: steps?.length ?? 0,
+        tools: toolNamesFromSteps(steps),
         sources: state.sourceRefs.length,
         proposedActions: state.proposedActions.length,
+        recovered,
       });
-      return this.buildResponse(agentRunId, input, state, finalText);
+      return this.buildResponse(agentRunId, input, state, finalText || "I couldn't complete that request.");
     } catch (error) {
       logger.warn("ToolLoopAgent stream failed", {
         agentRunId,
@@ -214,6 +235,35 @@ export class ToolLoopAgentService {
         state,
         "I ran into a problem completing that request. Please try rephrasing or narrowing it.",
       );
+    }
+  }
+
+  /** The loop can hit its step cap right after a tool call, ending with no final
+   *  text. Recover with one tools-off generation grounded in the tool transcript
+   *  so the user gets an honest status instead of a canned failure line. */
+  private async recoverAnswerFromSteps(
+    input: AgentRunInput,
+    steps: LoopStep[] | undefined,
+    onToken?: (delta: string) => void,
+  ): Promise<string | null> {
+    const transcript = describeSteps(steps);
+    if (!transcript) return null;
+    const execution = getAiExecutionContext();
+    try {
+      const { text } = await generateText({
+        model: env.GATEWAY_DEFAULT_MODEL,
+        system:
+          "You are Gideon, an operating assistant. A multi-step run hit its step limit before a reply was written. Using ONLY the tool transcript, tell the user plainly: what was accomplished (cite only ids the tools actually returned), what failed or is still missing and why, and the single best next step they can take. Never invent results. Be brief.",
+        prompt: `User request: ${input.input}\n\nTool transcript:\n${transcript}`,
+        ...(execution ? { abortSignal: execution.signal } : {}),
+      });
+      if (text && onToken) onToken(text);
+      return text || null;
+    } catch (error) {
+      logger.warn("ToolLoopAgent answer recovery failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 
@@ -249,6 +299,61 @@ export class ToolLoopAgentService {
 /** Model tool names must match ^[a-zA-Z0-9_-]+$ — registry names use dots. */
 export function sanitizeToolName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+const TRANSCRIPT_VALUE_LIMIT = 400;
+
+function truncateForTranscript(value: unknown): string {
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  if (!text) return "";
+  return text.length > TRANSCRIPT_VALUE_LIMIT ? `${text.slice(0, TRANSCRIPT_VALUE_LIMIT)}…` : text;
+}
+
+/** Compact per-step transcript (tool calls, results, errors) for answer recovery. */
+export function describeSteps(steps: LoopStep[] | undefined): string {
+  const lines: string[] = [];
+  for (const [i, step] of (steps ?? []).entries()) {
+    const parts = step.content ?? [];
+    if (parts.length) {
+      for (const part of parts) {
+        if (part.type === "tool-call") {
+          lines.push(`${i + 1}. call ${part.toolName}(${truncateForTranscript(part.input)})`);
+        } else if (part.type === "tool-result") {
+          lines.push(`   -> result: ${truncateForTranscript(part.output)}`);
+        } else if (part.type === "tool-error") {
+          lines.push(`   -> ERROR: ${truncateForTranscript(part.error)}`);
+        }
+      }
+    } else {
+      for (const call of step.toolCalls ?? []) {
+        lines.push(`${i + 1}. call ${call.toolName}(${truncateForTranscript(call.input)})`);
+      }
+      for (const tr of step.toolResults ?? []) {
+        lines.push(`   -> result: ${truncateForTranscript(tr.output)}`);
+      }
+    }
+    if (step.text?.trim()) lines.push(`   note: ${truncateForTranscript(step.text.trim())}`);
+  }
+  return lines.join("\n").slice(0, 6000);
+}
+
+/** Distinct tool names invoked across the run — for completion logs. */
+export function toolNamesFromSteps(steps: LoopStep[] | undefined): string[] {
+  const names = new Set<string>();
+  for (const step of steps ?? []) {
+    for (const part of step.content ?? []) {
+      if ((part.type === "tool-call" || part.type === "tool-error") && part.toolName) names.add(part.toolName);
+    }
+    for (const call of step.toolCalls ?? []) {
+      if (call.toolName) names.add(call.toolName);
+    }
+  }
+  return [...names];
 }
 
 function dedupeSources(refs: SourceRef[]): SourceRef[] {

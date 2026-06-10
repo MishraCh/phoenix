@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const generateMock = vi.fn();
 const streamMock = vi.fn();
+const generateTextMock = vi.fn();
 const capturedAgentConfig: { value?: any } = {};
 vi.mock("ai", () => ({
   ToolLoopAgent: class {
@@ -14,6 +15,7 @@ vi.mock("ai", () => ({
   },
   tool: (cfg: any) => cfg,
   stepCountIs: (n: number) => ({ stepCountIs: n }),
+  generateText: (...args: unknown[]) => generateTextMock(...args),
 }));
 
 vi.mock("../ai/execution/aiExecutionBudget.js", () => ({
@@ -65,6 +67,8 @@ function safeToolDef() {
 describe("ToolLoopAgentService", () => {
   beforeEach(() => {
     generateMock.mockReset();
+    streamMock.mockReset();
+    generateTextMock.mockReset();
     listToolsMock.mockReset();
     listToolsMock.mockResolvedValue([safeToolDef()]);
   });
@@ -194,6 +198,61 @@ describe("ToolLoopAgentService", () => {
     expect(result.resultType).toBe("answer");
     expect(result.sourceRefs).toHaveLength(1);
     expect(result.sourceRefs[0].url).toBe("https://acme.com");
+  });
+
+  it("recovers an honest answer when the loop ends with no final text (step cap after tool call)", async () => {
+    streamMock.mockResolvedValue({
+      textStream: (async function* () {})(),
+      text: Promise.resolve(""),
+      steps: Promise.resolve([
+        {
+          toolCalls: [{ toolName: "hubspot_searchCompanies", input: { query: "xoidlabs" } }],
+          toolResults: [{ toolName: "hubspot_searchCompanies", output: { records: [] } }],
+        },
+      ]),
+    });
+    generateTextMock.mockResolvedValue({ text: "I searched HubSpot but found no company named xoidlabs." });
+
+    const received: string[] = [];
+    const result = (await new ToolLoopAgentService({} as any).runStream(baseInput, (d) => received.push(d))) as any;
+
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    const recoveryArg = generateTextMock.mock.calls[0][0] as { prompt: string };
+    expect(recoveryArg.prompt).toContain("hubspot_searchCompanies");
+    expect(result.answer).toContain("no company named xoidlabs");
+    expect(received.join("")).toContain("no company named xoidlabs");
+  });
+
+  it("falls back to the canned line only when recovery itself fails", async () => {
+    streamMock.mockResolvedValue({
+      textStream: (async function* () {})(),
+      text: Promise.resolve(""),
+      steps: Promise.resolve([
+        { toolCalls: [{ toolName: "web_researchTask", input: { prompt: "x" } }], toolResults: [] },
+      ]),
+    });
+    generateTextMock.mockRejectedValue(new Error("gateway down"));
+
+    const result = (await new ToolLoopAgentService({} as any).runStream(baseInput, () => {})) as any;
+    expect(result.answer).toBe("I couldn't complete that request.");
+  });
+});
+
+describe("describeSteps / toolNamesFromSteps", () => {
+  it("builds a compact transcript from content parts incl. tool errors", async () => {
+    const { describeSteps, toolNamesFromSteps } = await import("../ai/agentic/toolLoopAgentService.js");
+    const steps = [
+      {
+        content: [
+          { type: "tool-call", toolName: "crm_enrichEntity", input: { name: "xoidlabs" } },
+          { type: "tool-error", toolName: "crm_enrichEntity", error: "record not found" },
+        ],
+      },
+    ];
+    const transcript = describeSteps(steps as any);
+    expect(transcript).toContain("crm_enrichEntity");
+    expect(transcript).toContain("ERROR: record not found");
+    expect(toolNamesFromSteps(steps as any)).toEqual(["crm_enrichEntity"]);
   });
 });
 
