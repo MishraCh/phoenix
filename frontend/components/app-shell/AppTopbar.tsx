@@ -51,18 +51,15 @@ export function AppTopbar({
             <span className="sr-only">Open navigation</span>
           </Button>
 
-          <Link href="/command-center" className="flex shrink-0 items-center gap-2 rounded-2xl px-1 py-1 transition hover:bg-white/80">
+          <Link href="/command-center" className="flex shrink-0 items-center rounded-2xl px-1 py-1 transition hover:bg-white/80">
             <Image
-              src="/phoenix-ai.png"
+              src="/phoenix-wordmark.png"
               alt="Phoenix AI"
-              width={32}
-              height={32}
-              className="h-8 w-8 object-contain"
+              width={97}
+              height={48}
+              className="h-12 w-auto object-contain"
               priority
             />
-            <span className="hidden text-[1.05rem] font-semibold tracking-[-0.03em] text-foreground sm:inline">
-              Phoenix <span className="text-primary">AI</span>
-            </span>
           </Link>
         </div>
 

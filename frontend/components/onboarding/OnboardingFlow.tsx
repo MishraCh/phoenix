@@ -570,7 +570,7 @@ export function OnboardingFlow() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            <Image src="/phoenix-ai.png" alt="Phoenix AI" width={64} height={64} className="rounded-xl" priority />
+            <Image src="/phoenix-wordmark.png" alt="Phoenix AI" width={130} height={64} className="h-16 w-auto" priority />
             <StepDots current={step} />
           </motion.div>
         )}
@@ -596,7 +596,7 @@ export function OnboardingFlow() {
                 >
                   <motion.div
                     variants={fadeUp}
-                    className="relative mx-auto mb-8 flex size-[104px] items-center justify-center"
+                    className="relative mx-auto mb-8 flex h-[120px] w-[232px] items-center justify-center"
                   >
                     <motion.div
                       className="absolute inset-0 rounded-2xl bg-primary/10"
@@ -608,7 +608,7 @@ export function OnboardingFlow() {
                       animate={{ scale: [1, 1.12, 1], opacity: [0.7, 0, 0.7] }}
                       transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: 0.3 }}
                     />
-                    <Image src="/phoenix-ai.png" alt="Phoenix AI" width={96} height={96} className="relative rounded-[18px] shadow-md" priority />
+                    <Image src="/phoenix-wordmark.png" alt="Phoenix AI" width={194} height={96} className="relative h-24 w-auto" priority />
                   </motion.div>
 
                   <motion.h1

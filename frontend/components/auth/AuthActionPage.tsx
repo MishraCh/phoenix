@@ -219,12 +219,7 @@ export function AuthActionPage() {
         <div className="relative flex min-h-screen flex-col bg-white lg:min-h-0 lg:overflow-hidden">
           <div className="mx-auto flex w-full max-w-[34rem] flex-1 flex-col px-6 py-6 sm:px-8 lg:justify-between lg:px-10 lg:py-7">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2.5">
-                <Image src="/phoenix-ai.png" alt="Phoenix AI" width={38} height={38} className="h-9 w-9 sm:h-10 sm:w-10" priority />
-                <span className="text-[1.35rem] font-semibold tracking-[-0.03em] text-[#0B1C30] sm:text-[1.5rem]">
-                  Phoenix <span className="text-[#3525CD]">AI</span>
-                </span>
-              </span>
+              <Image src="/phoenix-wordmark.png" alt="Phoenix AI" width={113} height={56} className="h-12 w-auto sm:h-14" priority />
             </div>
 
             <div className="mt-8 flex-1 lg:mt-6 lg:flex lg:flex-col lg:justify-center">

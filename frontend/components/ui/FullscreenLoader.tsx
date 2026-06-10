@@ -46,13 +46,13 @@ export function FullscreenLoader({ title, description, steps }: FullscreenLoader
 
         {/* Logo mark */}
         <div className="relative mb-8">
-          <div className="flex size-16 items-center justify-center rounded-2xl border border-border/60 bg-white shadow-panel">
+          <div className="flex items-center justify-center rounded-2xl border border-border/60 bg-white px-5 py-3 shadow-panel">
             <Image
-              src="/phoenix-ai.png"
+              src="/phoenix-wordmark.png"
               alt="Phoenix AI"
-              width={44}
-              height={44}
-              className="h-10 w-10 object-contain"
+              width={113}
+              height={56}
+              className="h-14 w-auto object-contain"
               priority
             />
           </div>

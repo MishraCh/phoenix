@@ -598,18 +598,15 @@ export function LandingPage() {
     <div className={cn("bg-white text-[#0A0A0A]", outfit.variable, inter.variable, mono.variable)}>
       <header className="sticky top-0 z-50 border-b border-[rgba(229,229,229,0.8)] bg-white/75 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center justify-between gap-6 px-5 lg:px-10">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center">
             <Image
-              src="/phoenix-ai.png"
+              src="/phoenix-wordmark.png"
               alt="Phoenix AI"
-              width={36}
-              height={36}
-              className="h-9 w-9"
+              width={105}
+              height={52}
+              className="h-[52px] w-auto"
               priority
             />
-            <span className={cn("text-[1.45rem] tracking-[-0.04em] text-[#0A0A0A]", outfit.className)}>
-              Phoenix <span className="text-[#5B50DC]">AI</span>
-            </span>
           </Link>
 
           <nav className={cn("hidden items-center gap-8 text-sm text-[#525252] lg:flex", inter.className)}>
@@ -1180,11 +1177,8 @@ export function LandingPage() {
       <footer className="border-t border-[rgba(229,229,229,0.8)] bg-white">
         <div className="mx-auto grid max-w-[1280px] gap-12 px-5 py-16 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto] lg:px-10">
           <div>
-            <div className="flex items-center gap-3">
-              <Image src="/phoenix-ai.png" alt="Phoenix AI" width={34} height={34} />
-              <span className={cn("text-[1.6rem] tracking-[-0.04em] text-[#0A0A0A]", outfit.className)}>
-                Phoenix <span className="text-[#5B50DC]">AI</span>
-              </span>
+            <div className="flex items-center">
+              <Image src="/phoenix-wordmark.png" alt="Phoenix AI" width={142} height={70} className="h-[70px] w-auto" />
             </div>
             <p className={cn("mt-4 max-w-[14rem] text-[14px] leading-7 text-[#737373]", inter.className)}>
               Phoenix — the operational AI platform for modern companies, powered by Gideon.
