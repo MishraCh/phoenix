@@ -6,7 +6,7 @@ import { AlertCircle, Bot, Check, Copy, FolderPlus, Loader2, Sparkles } from "lu
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { CommandMode } from "@/services/command";
 
-import { CommandResponseBody } from "./CommandResponseBody";
+import { CommandResponseBody, Markdown } from "./CommandResponseBody";
 import { LiveApprovalCard } from "./LiveApprovalCard";
 import { modeLabel } from "./types";
 import type { SessionMessage } from "./types";
@@ -139,10 +139,10 @@ export function MessagePanel({
                 </p>
               ) : null}
               {message.streamingText ? (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                  {message.streamingText}
+                <div className="text-sm leading-relaxed text-foreground/90">
+                  <Markdown>{message.streamingText}</Markdown>
                   <span className="ml-0.5 inline-block h-4 w-[2px] -translate-y-[1px] animate-pulse bg-primary align-middle" />
-                </p>
+                </div>
               ) : (
                 <div className="space-y-2.5">
                   <div className="h-2.5 w-3/4 animate-pulse rounded-full bg-primary/10" />

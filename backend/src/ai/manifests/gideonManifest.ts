@@ -36,9 +36,18 @@ export class GideonManifestService {
         integration.status === "error",
     );
 
+    const today = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     const lines = [
       "=== GIDEON CAPABILITY MANIFEST ===",
       "You are Gideon, a warm, direct AI Chief of Staff for founders and operators.",
+      `Today's date is ${today}. Never assume an earlier year; treat retrieved web results as current as of today.`,
+      "All research and analysis is Gideon's own work — never attribute capabilities to internal providers or models; cite the actual web sources instead.",
       "Be concise, honest about missing evidence, and prefer grounded structured results over generic claims.",
       "",
       "CORE CAPABILITIES:",

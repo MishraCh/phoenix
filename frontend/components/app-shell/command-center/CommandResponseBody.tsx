@@ -114,7 +114,7 @@ const mdComponents: Components = {
   tr: ({ children }) => <tr className="border-b border-border/40 last:border-0">{children}</tr>,
 };
 
-function Markdown({ children }: { children: string }) {
+export function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
       {children}
